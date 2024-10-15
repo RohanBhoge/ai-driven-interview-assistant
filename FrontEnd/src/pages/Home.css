@@ -1,0 +1,26 @@
+.home {
+  text-align: center;
+}
+
+.home h1 {
+  font-size: 36px;
+  margin-bottom: 20px;
+}
+
+.home p {
+  font-size: 18px;
+  margin-bottom: 30px;
+}
+
+.home .cta {
+  font-size: 18px;
+  padding: 10px 20px;
+  background-color: #337ab7;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.home .cta:hover {
+  background-color: #23527c;
+}
