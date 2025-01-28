@@ -1,16 +1,18 @@
-// Home.js
-import React from "react";
+import LeftSideContent from "../components/LeftSideContent";
+import Nav from "../components/Navbar";
+import RightSideContent from "../components/RightSideContent";
 import "./Home.css";
-import { Link } from "react-router-dom";
 
-function Home() {
+const Home = () => {
   return (
-    <div>
-      <h1>AI Interview Assistance</h1>
-      <p>Ace your interviews with AI-powered assistance</p>
-      <Link to="/login">Login</Link> or <Link to="/signup">Signup</Link>
-    </div>
+    <>
+      <Nav />
+      <div className="main">
+        <LeftSideContent />
+        <RightSideContent />
+      </div>
+    </>
   );
-}
-
+};
+  
 export default Home;

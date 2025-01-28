@@ -1,0 +1,7 @@
+.right-side-content {
+  width: 50%;
+  height: 100vh; /* Full viewport height */
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Center image in right side */
+}
