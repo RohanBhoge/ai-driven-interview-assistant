@@ -1,5 +1,7 @@
+import { useNavigate } from "react-router-dom";
 import "./LeftSideContent.css";
 const LeftSideContent = () => {
+  const navigation = useNavigate();
   return (
     <div className="left-side-content">
       <div className="heading">
@@ -10,7 +12,9 @@ const LeftSideContent = () => {
         Get the job you deserve with our AI-driven interview assistance tool
       </div>
       <div className="start-button">
-        <button>Start Interview</button>
+        <button onClick={() => navigation("/uploadpdf")}>
+          Start Interview
+        </button>
         <img src="" alt="next arrow" />
       </div>
     </div>
