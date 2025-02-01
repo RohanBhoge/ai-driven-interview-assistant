@@ -1,21 +1,16 @@
-/* Global Styles */
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: linear-gradient(to bottom, #bfdbfe, #3b82f6); /* Same gradient as login */
+.signup-page-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  height: auto;  /* Full viewport height */
+  padding: 2rem;
 }
 
 /* Signup Container */
 .signup-container {
-  background-color: #1e3a8a; /* Dark blue background */
   color: white;
   padding: 2rem;
   border-radius: 1rem;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
   max-width: 400px;
   width: 100%;
 }
@@ -81,11 +76,11 @@ body {
 }
 
 .signup-links a {
-  color: #93c5fd; /* Light blue for links */
+  color: #2563ec; /* Light blue for links */
   text-decoration: none;
   transition: color 0.3s ease-in-out;
 }
 
 .signup-links a:hover {
-  color: #60a5fa; /* Brighter blue on hover */
+  color: #0004d3; /* Brighter blue on hover */
 }

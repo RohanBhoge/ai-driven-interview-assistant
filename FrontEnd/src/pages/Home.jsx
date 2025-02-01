@@ -1,18 +1,16 @@
-import LeftSideContent from "../components/LeftSideContent";
-import Nav from "../components/Navbar";
-import RightSideContent from "../components/RightSideContent";
+import Footer from "../components/Footer";
+import HeroSection from "../components/HeroSection";
+import Navbar from "../components/Navbar";
 import "./Home.css";
 
 const Home = () => {
   return (
-    <>
-      <Nav />
-      <div className="main">
-        <LeftSideContent />
-        <RightSideContent />
-      </div>
-    </>
+    <div className="home">
+      <Navbar />
+      <HeroSection />
+      {/* <Footer /> */}
+    </div>
   );
 };
-  
+
 export default Home;

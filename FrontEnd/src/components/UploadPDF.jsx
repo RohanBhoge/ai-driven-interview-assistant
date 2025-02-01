@@ -1,10 +1,12 @@
 import { useState } from "react";
 import axios from "axios";
 import "./UploadPDF.css"; // Ensure you have this CSS file
+import { useAuth } from "../context/AuthContext";
 
 const UploadPDF = () => {
   const [file, setFile] = useState(null);
   const [text, setText] = useState("");
+  const { token } = useAuth();
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -22,11 +24,12 @@ const UploadPDF = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/upload",
+        "http://localhost:5000/api/pdf/upload",
         formData,
         {
           headers: {
             "Content-Type": "multipart/form-data",
+            "x-auth-token": token, // Include the JWT token
           },
         }
       );
@@ -58,4 +61,4 @@ const UploadPDF = () => {
   );
 };
 
-export default UploadPDF; 
+export default UploadPDF;

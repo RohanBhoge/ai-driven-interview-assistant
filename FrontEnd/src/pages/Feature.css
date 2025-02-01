@@ -1,0 +1,22 @@
+.features {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.features-content {
+  flex: 1;
+  padding: 2rem;
+  text-align: center;
+}
+
+.features-content h1 {
+  font-size: 2rem;
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.features-content p {
+  font-size: 1rem;
+  color: #666;
+}
