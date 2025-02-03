@@ -1,19 +1,29 @@
-import "./About.css";
 import Navbar from "../components/Navbar";
+import "./About.css";
+
 const About = () => {
   return (
-    <div className="about">
+    <>
       <Navbar />
-      <div className="about-content">
-        <h1>About Us</h1>
-        <p>
-          Ai-Driven Interview Assistance is dedicated to helping you conquer
-          interview anxiety and land your dream job. Our platform offers a wide
-          range of AI-driven tools and resources to help you practice and
-          improve your interview skills.
+      <div className="about-container">
+        <h1 className="about-title">About AI Interview Tool</h1>
+        <p className="about-description">
+          The AI Interview Tool is designed to help candidates practice
+          real-world interview scenarios using AI-driven technology. By
+          analyzing resumes and generating tailored questions, this tool ensures
+          a personalized and effective preparation experience.
         </p>
+
+        <h2 className="about-subtitle">Why Choose Our AI Interview Tool?</h2>
+        <ul className="about-list">
+          <li>✅ Real-time AI interviewer for an interactive experience</li>
+          <li>✅ Dynamic question difficulty adapts based on your answers</li>
+          <li>✅ Speech and video recording for self-analysis</li>
+          <li>✅ Comprehensive feedback to improve your responses</li>
+          <li>✅ Secure resume upload for skill-based question generation</li>
+        </ul>
       </div>
-    </div>
+    </>
   );
 };
 
