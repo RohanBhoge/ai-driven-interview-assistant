@@ -5,3 +5,5 @@ mongodb connection cluster 1
 
 Password: cnCW8imI45wGwvPo
 UserName:bhogerohan12
+
+cunnectionLink:mongodb+srv://bhogerohan12:<db_password>@cluster1.e6z8w.mongodb.net/?retryWrites=true&w=majority&appName=Cluster1

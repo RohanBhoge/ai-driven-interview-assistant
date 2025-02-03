@@ -4,7 +4,11 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  resume: { type: String }, // Store the file path or URL
+  resume: {
+    filename: { type: String },
+    contentType: { type: String },
+    uploadDate: { type: Date, default: Date.now },
+  },
 });
 
 module.exports = mongoose.model("User", userSchema);

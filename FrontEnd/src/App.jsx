@@ -6,6 +6,7 @@ import UploadPDF from "./components/UploadPDF";
 import { AuthProvider } from "./context/AuthContext";
 import About from "./pages/About";
 import Features from "./pages/Feature";
+import ProfilePage from "./pages/ProfilePage";
 
 function App() {
   return (
@@ -18,8 +19,8 @@ function App() {
           <Route path="/uploadpdf" element={<UploadPDF />} />
           <Route path="/about" element={<About />} />
           <Route path="/features" element={<Features />} />
-          {/* <Route path="/upload-resume" element={<UploadResume />} />
-        <Route path="/view-questions" element={<ViewQuestions />} /> */}
+          <Route path="/profile" element={<ProfilePage />} />
+          {/* <Route path="/view-questions" element={<ViewQuestions />} /> */}
         </Routes>
       </AuthProvider>
     </>
