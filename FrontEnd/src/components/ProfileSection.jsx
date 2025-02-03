@@ -8,11 +8,14 @@ const ProfileSection = () => {
   useEffect(() => {
     const fetchUserDetails = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/user/me", {
-          headers: {
-            "x-auth-token": localStorage.getItem("token"),
-          },
-        });
+        const response = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/user/me`,
+          {
+            headers: {
+              "x-auth-token": localStorage.getItem("token"),
+            },
+          }
+        );
         setUser(response.data);
         console.log("User details:", response.data);
       } catch (error) {
