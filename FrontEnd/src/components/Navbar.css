@@ -67,3 +67,80 @@
     margin-top: 1rem;
   }
 }
+
+/* Add these styles to your Navbar.css */
+
+.profile-icon {
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+}
+
+.profile-image {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.profile-image:hover {
+  transform: scale(1.05);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  min-width: 160px;
+  overflow: hidden;
+  z-index: 1000;
+  
+  /* Animation properties */
+  opacity: 0;
+  transform: translateY(-10px);
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.profile-icon:hover .dropdown-menu {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.dropdown-item {
+  padding: 0.75rem 1rem;
+  color: #374151;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dropdown-item:hover {
+  background-color: #f3f4f6;
+  color: #2563eb;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .dropdown-menu {
+    right: -20px;
+    min-width: 140px;
+  }
+
+  .profile-icon {
+    margin-top: 0.5rem;
+  }
+
+  .dropdown-item {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+}

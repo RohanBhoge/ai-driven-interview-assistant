@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import "./Navbar.css";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-
+import profileIcon from "../assets/profileIcon.svg";
 const Navbar = () => {
   const { token, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -34,7 +34,7 @@ const Navbar = () => {
             onMouseLeave={() => setShowDropdown(false)}
           >
             <img
-              src="https://via.placeholder.com/30" // Replace with your user icon
+              src={profileIcon} // Replace with your user icon
               alt="Profile"
               className="profile-image"
             />

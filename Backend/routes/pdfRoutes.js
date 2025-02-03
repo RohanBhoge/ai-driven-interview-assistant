@@ -1,9 +1,8 @@
 const express = require("express");
-const { upload } = require("../Config/gridfs.js");
-const { uploadPDF, downloadPDF } = require("../controllers/pdfController.js");
+const multer = require("multer");
 const authMiddleware = require("../middleware/authMiddleware.js");
-
+const { uploadPDF } = require("../controllers/pdfController.js");
 const router = express.Router();
+const upload = multer({ dest: "uploads/" });
 router.post("/upload", authMiddleware, upload.single("pdf"), uploadPDF);
-router.get("/download/:filename", authMiddleware, downloadPDF);
 module.exports = router;

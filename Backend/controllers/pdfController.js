@@ -1,56 +1,23 @@
-const User = require("../models/user.js");
-const { gfs } = require("../Config/gridfs.js");
-
-// Upload PDF
+const User = require("../models/User.js");
+const pdf = require("pdf-parse");
+const fs = require("fs");
+// Upload and extract text from PDF
 const uploadPDF = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded." });
+  }
   try {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
+    const dataBuffer = fs.readFileSync(req.file.path);
+    const data = await pdf(dataBuffer);
+    // Save the file path to the user's document
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    user.resume = {
-      filename: req.file.filename,
-      contentType: req.file.contentType,
-      uploadDate: new Date(),
-    };
-
+    user.resume = req.file.path;
     await user.save();
-
-    res.status(201).json({
-      message: "File uploaded successfully",
-      filename: user.resume.filename,
-    });
+    fs.unlinkSync(req.file.path); // Delete the file after processing
+    res.json({ text: data.text });
   } catch (error) {
-    console.error("Upload error:", error);
-    res.status(500).json({ message: "Upload failed" });
+    console.error("Error extracting text:", error);
+    res.status(500).json({ message: "Failed to extract text from PDF." });
   }
 };
-
-// Download PDF
-// controllers/pdfController.js
-const downloadPDF = async (req, res) => {
-  try {
-    const files = await gfs.find({ filename: req.params.filename }).toArray();
-
-    if (!files.length) {
-      return res.status(404).json({ message: "File not found" });
-    }
-
-    const file = files[0];
-
-    if (file.contentType !== "application/pdf") {
-      return res.status(400).json({ message: "Not a PDF file" });
-    }
-
-    const downloadStream = gfs.openDownloadStream(file._id);
-    res.set("Content-Type", file.contentType);
-    res.set("Content-Disposition", `attachment; filename="${file.filename}"`);
-    downloadStream.pipe(res);
-  } catch (error) {
-    console.error("Download error:", error);
-    res.status(500).json({ message: "Download failed" });
-  }
-};
-
-module.exports = { uploadPDF, downloadPDF };
+module.exports = { uploadPDF };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import "./ProfileSection.css";
 
@@ -14,40 +14,17 @@ const ProfileSection = () => {
           },
         });
         setUser(response.data);
+        console.log("User details:", response.data);
       } catch (error) {
-        console.error("Error fetching user details:", error);
+        console.error(
+          "Error fetching user details:",
+          error.response?.data || error.message
+        );
       }
     };
 
     fetchUserDetails();
   }, []);
-
-  const handleDownload = async (filename) => {
-    try {
-      const response = await axios.get(
-        `http://localhost:5000/api/pdf/download/${filename}`,
-        {
-          responseType: "blob",
-          headers: {
-            "x-auth-token": localStorage.getItem("token"),
-          },
-        }
-      );
-
-      // Create a Blob from the PDF Stream
-      const file = new Blob([response.data], { type: "application/pdf" });
-      const fileURL = URL.createObjectURL(file);
-      const tempLink = document.createElement("a");
-      tempLink.href = fileURL;
-      tempLink.setAttribute("download", filename);
-      tempLink.click();
-      URL.revokeObjectURL(fileURL);
-      tempLink.remove();
-    } catch (error) {
-      console.error("Error downloading file:", error);
-      alert("Failed to download file.");
-    }
-  };
 
   if (!user) {
     return <div>Loading...</div>;
@@ -63,14 +40,11 @@ const ProfileSection = () => {
         <p>
           <strong>Email:</strong> {user.email}
         </p>
-        {user.resume && (
+        {/* {user.resume && (
           <p>
-            <strong>Resume:</strong>{" "}
-            <button onClick={() => handleDownload(user.resume.filename)}>
-              Download
-            </button>
+            <strong>Resume:</strong> <a href={user.resume}>Download</a>
           </p>
-        )}
+        )} */}
       </div>
     </div>
   );

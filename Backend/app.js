@@ -1,30 +1,22 @@
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
+const dotenv = require("dotenv");
 const connectDB = require("./config/db.js");
+const authRoutes = require("./routes/authRoutes.js");
+const pdfRoutes = require("./routes/pdfRoutes.js");
+const userRoutes = require("./routes/userRoutes.js");
 
-// 1. Load environment FIRST
-dotenv.config({ path: "./.env" });
-
-// 2. Connect to MongoDB
-connectDB();
-
-// 3. Now import routes AFTER connection
-const authRoutes = require("./routes/authRoutes");
-const pdfRoutes = require("./routes/pdfRoutes");
-const userRoutes = require("./routes/userRoutes");
-
+dotenv.config();
 const app = express();
-
 // Middleware
 app.use(cors());
 app.use(express.json());
-
+// Database connection
+connectDB();
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/pdf", pdfRoutes);
 app.use("/api/user", userRoutes);
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
