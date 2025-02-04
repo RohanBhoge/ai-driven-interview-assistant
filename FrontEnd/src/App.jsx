@@ -20,7 +20,6 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/features" element={<Features />} />
           <Route path="/profile" element={<ProfilePage />} />
-          {/* <Route path="/view-questions" element={<ViewQuestions />} /> */}
         </Routes>
       </AuthProvider>
     </>

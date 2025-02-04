@@ -9,7 +9,7 @@ const ProfileSection = () => {
     const fetchUserDetails = async () => {
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/user/me`,
+          `${import.meta.env.VITE_BACKEND_URL}/api/user/me`,
           {
             headers: {
               "x-auth-token": localStorage.getItem("token"),

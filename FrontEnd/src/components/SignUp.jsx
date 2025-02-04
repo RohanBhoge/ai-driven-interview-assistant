@@ -33,7 +33,7 @@ const SignUp = () => {
     try {
       // Send a POST request to the backend
       const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/auth/register`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`,
         {
           name: formData.name,
           email: formData.email,

@@ -25,7 +25,7 @@ const UploadPDF = () => {
 
     try {
       const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/pdf/upload`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/pdf/upload`,
         formData,
         {
           headers: {

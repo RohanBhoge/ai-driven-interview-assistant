@@ -24,7 +24,7 @@ const Login = () => {
     try {
       // Send a POST request to the backend
       const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/auth/login`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/login`,
         {
           email: formData.email,
           password: formData.password,

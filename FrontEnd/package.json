@@ -1,9 +1,9 @@
 {
-  "name": "ai",
+  "name": "aiDrivenInterviewAssistant",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://yourusername.github.io/your-repository-name",
+  "homepage": "https://github.com/RohanBhoge/ai-driven-interview-assistance",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

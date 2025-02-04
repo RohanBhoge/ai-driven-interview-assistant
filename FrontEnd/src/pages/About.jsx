@@ -6,7 +6,7 @@ const About = () => {
     <>
       <Navbar />
       <div className="about-container">
-        <h1 className="about-title">About AI Interview Tool</h1>
+        <h1 className="about-title">About AI Driven Interview Assistant</h1>
         <p className="about-description">
           The AI Interview Tool is designed to help candidates practice
           real-world interview scenarios using AI-driven technology. By
