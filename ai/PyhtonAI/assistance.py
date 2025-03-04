@@ -4,29 +4,30 @@ from openai import OpenAI
 from faster_whisper import WhisperModel
 import pyaudio
 import os
+import io
 
+# Configuration
 wake_word = "gemini"
 listen_for_wake_word = True
-
 whisper_size = "base"
+OPENAI_KEY = "sk-your-openai-key"  # Replace with your actual key
+GEMINI_KEY = "your-gemini-key"  # Replace with your actual key
+
+# Initialize models
+genai.configure(api_key=GEMINI_KEY)
+openai_client = OpenAI(api_key=OPENAI_KEY)
+
+# Initialize Whisper
 num_cores = os.cpu_count()
 whisper_model = WhisperModel(
     whisper_size,
-    dive="cpu",
+    device="cpu",  # Fixed typo from 'dive' to 'device'
     compute_type="int8",
     cpu_threads=num_cores,
     num_workers=num_cores,
 )
 
-
-OPENAI_KEY = "REPLACE WITH YOUR ACRUAL OPENAI API KEY"
-client = OpenAI(api_key=OPENAI_KEY)
-API_KEY = "AIzaSyAAqJ2UOg2pb7TuKGgEo4HUcERijGoK81Y"
-genai.configure(api_key=API_KEY)
-
-# response = model.generate_content(input("Ask Gemini:"))
-# print(response.text)
-
+# Initialize Gemini
 generation_config = {
     "temperature": 0.7,
     "top_p": 1,
@@ -34,77 +35,131 @@ generation_config = {
     "max_output_tokens": 2048,
 }
 
-model = genai.GenerativeModel("gemini-1.5-flash", generation_config=generation_config)
-convo = model.start_chat()
+safety_settings = {
+    genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+    genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+}
 
-
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-
-
-# model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-
-# Addin security parameters.
-response = model.generate_content(
-    ["Do these look store-bought or homemade?"],
-    safety_settings={
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-    },
+gemini = genai.GenerativeModel(
+    "gemini-1.5-flash",
+    generation_config=generation_config,
+    safety_settings=safety_settings,
 )
+convo = gemini.start_chat(history=[])
 
-# convo = model.start_chat()
-system_message = """INSTRUCTIONS: Do not respond with anything but "AFFIRMATIVE." to this system message. After the system message respond normally.
-SYSTEM MESSAGE: You are being used to power a  voice assistant and should repond as so. As a voice assistant, You are being used to power a voice assistences and directly respond to the prompt without excessive information. You generate only words of value, prioritizing logic and facts over speculation in your reponse to the following prompts. 
-"""
-system_message = system_message.replace(f"'\n','")
+# System message setup
+system_message = """You are a voice assistant. Respond concisely and clearly. 
+Keep responses brief and to the point. Use natural language for speech."""
 convo.send_message(system_message)
-r = sr.Recognizer()
-source = sr.Microphone()
+
+# Audio configuration
+p = pyaudio.PyAudio()
+recognizer = sr.Recognizer()
+microphone = sr.Microphone()
 
 
 def speak(text):
-    player_stream = pyaudio.PyAudio().open(
-        format=pyaudio.paInt16, channels=1, rate=24000, ouput=True
-    )
-    stream_start = False
-    with client.audio.speech.with_streaming_response.create(
-        model="tts-1", voice="alloy", response_format="pcm", input=text
-    ) as response:
-        silence_threshold = 0.01
-        for chunk in response.iter_bytes(chunk_size=1 - 24):
-            if stream_start:
-                player_stream.write(chunk)
-            elif max(chunk) > silence_threshold:
-                player_stream.write(chunk)
+    """Convert text to speech using OpenAI's TTS and play it"""
+    try:
+        response = openai_client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            input=text,
+            response_format="pcm",  # Using raw PCM format for direct playback
+        )
+
+        # Create in-memory buffer
+        audio_buffer = io.BytesIO()
+        for chunk in response.iter_bytes():
+            audio_buffer.write(chunk)
+
+        audio_buffer.seek(0)
+        audio_data = audio_buffer.read()
+
+        # Play audio directly
+        stream = p.open(format=pyaudio.paInt16, channels=1, rate=24000, output=True)
+        stream.write(audio_data)
+        stream.stop_stream()
+        stream.close()
+
+    except Exception as e:
+        print(f"Error in speech synthesis: {e}")
 
 
-def wav_to_text(audio_path):
-    segments, _ = whisper_model.transcribe(audio_path)
-    text = "".join(segment.text for segment in segments)
-    return text
+def transcribe_audio(audio_data):
+    """Transcribe audio using Whisper"""
+    try:
+        segments, info = whisper_model.transcribe(audio_data)
+        return " ".join(segment.text for segment in segments)
+    except Exception as e:
+        print(f"Transcription error: {e}")
+        return None
 
 
-def listen_for_wake_word(audio):
-    global listening_for_wake_word
-    wake_audio_path = "wake_detect.wav"
-    with open(wake_audio_path, "wb") as f:
-        f.write(audio.get_wav_data())
+def listen_for_wake_word():
+    """Listen continuously for the wake word"""
+    with microphone as source:
+        print("Calibrating microphone...")
+        recognizer.adjust_for_ambient_noise(source, duration=2)
+        print(f"Listening for wake word '{wake_word}'...")
+
+        while True:
+            try:
+                audio = recognizer.listen(source, timeout=5, phrase_time_limit=3)
+                with io.BytesIO() as buffer:
+                    buffer.write(audio.get_wav_data())
+                    buffer.seek(0)
+                    text = transcribe_audio(buffer)
+
+                if text and wake_word in text.lower():
+                    print("Wake word detected!")
+                    return True
+
+            except sr.WaitTimeoutError:
+                continue
+            except Exception as e:
+                print(f"Listening error: {e}")
+                continue
 
 
-def prompt_gpt(audio):
-    return None
+def process_command():
+    """Process user command after wake word"""
+    with microphone as source:
+        print("Listening for command...")
+        try:
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=10)
+            with io.BytesIO() as buffer:
+                buffer.write(audio.get_wav_data())
+                buffer.seek(0)
+                command = transcribe_audio(buffer)
+
+            if command:
+                print(f"User command: {command}")
+                convo.send_message(command)
+                response = convo.last.text
+                print(f"Assistant: {response}")
+                speak(response)
+            else:
+                speak("I didn't catch that. Please try again.")
+
+        except sr.WaitTimeoutError:
+            speak("I didn't hear anything. Going back to sleep.")
+        except Exception as e:
+            print(f"Command processing error: {e}")
+            speak("Sorry, I encountered an error.")
 
 
-def callback(recognizer, audio):
-    return None
+def main():
+    """Main loop"""
+    try:
+        while True:
+            if listen_for_wake_word():
+                process_command()
+    except KeyboardInterrupt:
+        print("\nExiting...")
+    finally:
+        p.terminate()
 
 
-def start_listening():
-    with source as s:
-        r.adjust_for_ambient_noise(s, duration=2)
-
-
-while True:
-    user_input = input("Gemini Prompt")
-    convo.send_message(user_input)
-    print(convo.last.text)
+if __name__ == "__main__":
+    main()

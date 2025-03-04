@@ -9,7 +9,7 @@ const LeftSideContent = () => {
         our AI Interview Tool
       </div>
       <div className="sub-heading">
-        Get the job you deserve with our AI-driven interview assistant tool
+        Get the job you deserve with our AI-driven Interview assistance tool
       </div>
       <div className="start-button">
         <button onClick={() => navigation("/uploadpdf")}>
