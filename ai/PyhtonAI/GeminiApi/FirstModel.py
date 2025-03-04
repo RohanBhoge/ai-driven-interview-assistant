@@ -12,24 +12,15 @@ import tempfile
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Initialize Speech Recognizer
+# Initialize audio system once
+pygame.mixer.init()
 recognizer = sr.Recognizer()
 
 
-# Step 1: Parse Resume PDF
-def read_resume(pdf_path):
-    print("Reading your resume... 📄")
-    reader = PdfReader(pdf_path)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
-
-
 def speak(text):
-    """Convert text to speech with proper audio queuing and temporary files"""
+    """Convert text to speech with proper audio queuing"""
     if not text.strip():
-        print("⚠️ No valid text to speak!")
+        print("⚠️ No text to speak!")
         return
 
     try:
@@ -37,49 +28,45 @@ def speak(text):
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
             tts = gTTS(text=text, lang="en")
             tts.save(fp.name)
+            temp_path = fp.name
 
         # Wait for previous audio to finish
         while pygame.mixer.get_busy():
             time.sleep(0.1)
 
-        # Load and play new audio
-        sound = pygame.mixer.Sound(fp.name)
-        sound.play()
+        # Load and play audio
+        sound = pygame.mixer.Sound(temp_path)
+        channel = sound.play()
 
-        # Wait for audio to finish playing
-        time.sleep(sound.get_length() + 0.5)  # Add small buffer
+        # Wait for audio to finish
+        while channel.get_busy():
+            time.sleep(0.1)
 
-        # Clean up temporary file
-        os.remove(fp.name)
+        # Clean up
+        os.remove(temp_path)
 
     except Exception as e:
-        print(f"Error in speak(): {e}")
-
-
-# Step 3: Capture user's voice response and transcribe it
+        print(f"Audio error: {e}")
 
 
 def listen():
-    """Capture and transcribe user's voice response with better timing"""
+    """Capture voice input with better timing"""
     with sr.Microphone() as source:
         print("\n🎤 Listening... (Speak now)")
         recognizer.adjust_for_ambient_noise(source)
 
         try:
-            # Wait 0.5s after speech ends before processing
-            audio = recognizer.listen(source, phrase_time_limit=15, timeout=10)
-            text = recognizer.recognize_google(audio)
-            print(f"🗣️ You said: {text}")
-            return text
+            audio = recognizer.listen(source, timeout=8, phrase_time_limit=15)
+            return recognizer.recognize_google(audio)
         except sr.WaitTimeoutError:
-            print("⏳ Listening timed out")
-            return "No response"
+            print("⌛ No speech detected")
+            return ""
         except sr.UnknownValueError:
-            print("🔇 Could not understand audio")
-            return "Could not understand"
-        except sr.RequestError as e:
-            print(f"🚨 Recognition error: {e}")
-            return "Error in processing"
+            print("🔇 Couldn't understand audio")
+            return ""
+        except Exception as e:
+            print(f"🎤 Error: {e}")
+            return ""
 
 
 # Step 4: Ask Questions with Voice
@@ -98,6 +85,16 @@ def ask_question(resume_text, difficulty="medium"):
     except Exception as e:
         print(f"Error generating question: {e}")
         return None
+
+
+# Step 1: Parse Resume PDF
+def read_resume(pdf_path):
+    print("Reading your resume... 📄")
+    reader = PdfReader(pdf_path)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text()
+    return text
 
 
 # Step 5: Analyze Answer
@@ -144,24 +141,20 @@ def start_interview():
     resume_text = read_resume(resume_path)
     difficulty = "medium"
 
-    for i in range(3):  # Ask 3 questions
-        # Generate and speak question
+    for i in range(3):
         question = ask_question(resume_text, difficulty)
         if not question:
-            print("❌ Failed to generate question")
             continue
 
         print(f"\n📝 Question {i+1}: {question}")
         speak(question)
         time.sleep(0.5)  # Pause after question
 
-        # Get answer
         answer = listen()
+        print(f"🗣️ Response: {answer}" if answer else "🔇 No response")
         time.sleep(0.5)  # Pause before feedback
 
-        # Process feedback
         feedback, next_difficulty = analyze_answer(question, answer)
-
         print(f"\n✅ Feedback: {feedback}")
         speak(feedback)
         time.sleep(1)  # Pause after feedback
