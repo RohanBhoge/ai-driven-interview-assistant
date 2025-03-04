@@ -25,162 +25,61 @@ def read_resume(pdf_path):
         text += page.extract_text()
     return text
 
-    # Step 2: Convert text to speech and play
-    # def speak(text):
-    #     print(f"AI: {text}")  # Debugging text output
-    #     tts = gTTS(text=text, lang="en")
-    #     tts.save("question.mp3")
 
-    #     # Play the audio
-    #     pygame.mixer.init()
-    #     pygame.mixer.music.load("question.mp3")
-    #     pygame.mixer.music.play()
-
-    #     while pygame.mixer.music.get_busy():
-    #         continue  # Wait until the speech finishes playing
-
-    # def speak(text):
-    #     save_path = os.path.join(
-    #         os.getcwd(), "audio"
-    #     )  # Create an 'audio' folder in the current directory
-    #     os.makedirs(save_path, exist_ok=True)  # Ensure the folder exists
-    #     file_path = os.path.join(save_path, "question.mp3")  # Full path for the file
-
-    #     tts = gTTS(text=text, lang="en")
-    #     tts.save(file_path)  # Save file in 'audio' folder
-
-    #     pygame.mixer.init()
-    #     pygame.mixer.music.load(file_path)
-    #     pygame.mixer.music.play()
-
-    #     while pygame.mixer.music.get_busy():
-    #         pygame.time.Clock().tick(10)
-
-    # def speak(text):
-    #     # Use a directory with write permissions
-    #     save_path = os.path.join(os.path.expanduser("~"), "Documents", "AI_Audio")
-    #     os.makedirs(save_path, exist_ok=True)  # Ensure the folder exists
-
-    #     file_path = os.path.join(save_path, "question.mp3")  # Store in AI_Audio folder
-
-    #     tts = gTTS(text=text, lang="en")
-    #     tts.save(file_path)  # Save to the new directory
-
-    #     pygame.mixer.init()
-    #     pygame.mixer.music.load(file_path)
-    #     pygame.mixer.music.play()
-
-    #     while pygame.mixer.music.get_busy():
-    #         pygame.time.Clock().tick(10)
-
-    # def speak(text):
-    if not text or text.strip() == "":
+def speak(text):
+    """Convert text to speech with proper audio queuing and temporary files"""
+    if not text.strip():
         print("⚠️ No valid text to speak!")
         return
 
-    save_path = os.path.join(os.getcwd(), "audio")
-    os.makedirs(save_path, exist_ok=True)
-    file_path = os.path.join(save_path, "question.mp3")
-
     try:
-        tts = gTTS(text=text, lang="en")
-        tts.save(file_path)
+        # Create temporary audio file
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
+            tts = gTTS(text=text, lang="en")
+            tts.save(fp.name)
 
-        pygame.mixer.quit()  # Ensure clean initialization
-        pygame.mixer.init()
-        pygame.mixer.music.load(file_path)
-        pygame.mixer.music.play()
+        # Wait for previous audio to finish
+        while pygame.mixer.get_busy():
+            time.sleep(0.1)
 
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
+        # Load and play new audio
+        sound = pygame.mixer.Sound(fp.name)
+        sound.play()
 
-    except Exception as e:
-        print(f"Error in speak(): {e}")
+        # Wait for audio to finish playing
+        time.sleep(sound.get_length() + 0.5)  # Add small buffer
 
-
-def speak(text):
-    try:
-        pygame.mixer.init()
-        pygame.mixer.music.stop()  # Stop any ongoing audio
-        time.sleep(0.5)  # Short delay before playing new audio
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
-            audio_path = temp_audio.name
-
-        tts = gTTS(text)
-        tts.save(audio_path)
-
-        pygame.mixer.music.load(audio_path)
-        pygame.mixer.music.play()
-
-        while pygame.mixer.music.get_busy():
-            time.sleep(0.5)
-
-        os.remove(audio_path)
+        # Clean up temporary file
+        os.remove(fp.name)
 
     except Exception as e:
         print(f"Error in speak(): {e}")
 
 
 # Step 3: Capture user's voice response and transcribe it
-# def listen():
-#     with sr.Microphone() as source:
-#         print("Listening for your response... 🎤")
-#         recognizer.adjust_for_ambient_noise(source)
-#         try:
-#             audio = recognizer.listen(source, timeout=10)  # 10 seconds to answer
-#             text = recognizer.recognize_google(audio)
-#             print(f"You said: {text}")
-#             return text
-#         except sr.UnknownValueError:
-#             print("Sorry, I couldn't understand that.")
-#             return "I couldn't understand the answer."
-#         except sr.RequestError:
-#             print("Speech Recognition service is down.")
-#             return "Error in processing."
-
-
-# def listen():
-#     with sr.Microphone() as source:
-#         print("Listening for your response... 🎤")
-#         recognizer.adjust_for_ambient_noise(source)
-#         attempt = 0
-
-#         while attempt < 3:  # Allow up to 3 attempts
-#             try:
-#                 audio = recognizer.listen(source, timeout=10)  # 10 seconds to answer
-#                 text = recognizer.recognize_google(audio)
-#                 print(f"You said: {text}")
-#                 return text
-#             except sr.UnknownValueError:
-#                 print("I couldn't understand that. Please try again.")
-#                 attempt += 1
-#             except sr.RequestError:
-#                 print("Speech Recognition service is down.")
-#                 return "Error in processing."
-
-#         return "No response detected."
 
 
 def listen():
-    recognizer = sr.Recognizer()
+    """Capture and transcribe user's voice response with better timing"""
     with sr.Microphone() as source:
-        print("🎤 Listening... (Speak clearly)")
+        print("\n🎤 Listening... (Speak now)")
         recognizer.adjust_for_ambient_noise(source)
 
-        for attempt in range(3):  # Allow 3 attempts
-            try:
-                audio = recognizer.listen(source, timeout=10)
-                text = recognizer.recognize_google(audio)
-                print(f"🗣️ You said: {text}")
-                return text
-            except sr.UnknownValueError:
-                print(f"⚠️ Couldn't understand. Attempt {attempt + 1}/3. Try again.")
-            except sr.RequestError:
-                print("❌ Speech Recognition service is down.")
-                return "Error"
-
-        return "No response detected."
+        try:
+            # Wait 0.5s after speech ends before processing
+            audio = recognizer.listen(source, phrase_time_limit=15, timeout=10)
+            text = recognizer.recognize_google(audio)
+            print(f"🗣️ You said: {text}")
+            return text
+        except sr.WaitTimeoutError:
+            print("⏳ Listening timed out")
+            return "No response"
+        except sr.UnknownValueError:
+            print("🔇 Could not understand audio")
+            return "Could not understand"
+        except sr.RequestError as e:
+            print(f"🚨 Recognition error: {e}")
+            return "Error in processing"
 
 
 # Step 4: Ask Questions with Voice
@@ -246,23 +145,30 @@ def start_interview():
     difficulty = "medium"
 
     for i in range(3):  # Ask 3 questions
+        # Generate and speak question
         question = ask_question(resume_text, difficulty)
         if not question:
-            print("❌ Failed to generate a question. Trying again...")
-            continue  # Skip to the next attempt
+            print("❌ Failed to generate question")
+            continue
 
-        print(f"\n📝 **Question {i+1}:** {question}")  # Display question on screen
-        speak(question)  # Read the question aloud
+        print(f"\n📝 Question {i+1}: {question}")
+        speak(question)
+        time.sleep(0.5)  # Pause after question
 
-        answer = listen()  # Capture answer via voice
+        # Get answer
+        answer = listen()
+        time.sleep(0.5)  # Pause before feedback
+
+        # Process feedback
         feedback, next_difficulty = analyze_answer(question, answer)
 
-        print(f"\n✅ **Feedback:** {feedback}")  # Show feedback on screen
-        speak(feedback)  # Speak the feedback
+        print(f"\n✅ Feedback: {feedback}")
+        speak(feedback)
+        time.sleep(1)  # Pause after feedback
 
-        difficulty = next_difficulty  # Adjust difficulty for the next question
+        difficulty = next_difficulty
 
-    print("\n🎯 **Interview Complete!** 🎯")
+    print("\n🎯 Interview Complete!")
 
 
 # Start the program!
