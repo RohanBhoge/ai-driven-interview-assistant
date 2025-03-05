@@ -50,16 +50,25 @@ def speak(text):
 
 
 def listen():
-    """Capture voice input with better timing"""
+    """Capture voice input with better pause handling"""
     with sr.Microphone() as source:
         print("\n🎤 Listening... (Speak now)")
         recognizer.adjust_for_ambient_noise(source)
+        recognizer.pause_threshold = 1.5  # Allow longer pauses
+        recognizer.energy_threshold = 4000  # Adjust for background noise
 
         try:
-            audio = recognizer.listen(source, timeout=8, phrase_time_limit=15)
-            return recognizer.recognize_google(audio)
+            # Increased timeouts for better capture
+            audio = recognizer.listen(
+                source,
+                timeout=10,  # Wait 10s for speech to start
+                phrase_time_limit=30,  # Allow 30s answers
+            )
+            text = recognizer.recognize_google(audio)
+            print(f"🗣️ Full answer captured: {text}")
+            return text
         except sr.WaitTimeoutError:
-            print("⌛ No speech detected")
+            print("⌛ No speech detected after 10 seconds")
             return ""
         except sr.UnknownValueError:
             print("🔇 Couldn't understand audio")
@@ -69,7 +78,7 @@ def listen():
             return ""
 
 
-# Step 4: Ask Questions with Voice
+# In ask_question function - REMOVE the speak() call here
 def ask_question(resume_text, difficulty="medium"):
     model = genai.GenerativeModel("gemini-2.0-flash")
     prompt = f"""  
@@ -80,8 +89,7 @@ def ask_question(resume_text, difficulty="medium"):
     try:
         response = model.generate_content(prompt)
         question = response.text
-        speak(question)  # Convert text to speech
-        return question
+        return question  # Only return the question, don't speak here
     except Exception as e:
         print(f"Error generating question: {e}")
         return None
@@ -146,20 +154,35 @@ def start_interview():
         if not question:
             continue
 
+        # First show the question
         print(f"\n📝 Question {i+1}: {question}")
+
+        # Then speak it after 1 second
+        time.sleep(1)
         speak(question)
-        time.sleep(0.5)  # Pause after question
+
+        # Add listening indicator
+        print(
+            "\n💡 After the audio finishes, you'll have 3 seconds to start speaking..."
+        )
+        time.sleep(2)  # Pause after question audio
 
         answer = listen()
-        print(f"🗣️ Response: {answer}" if answer else "🔇 No response")
-        time.sleep(0.5)  # Pause before feedback
+        print(f"\n📋 Your answer: {answer}" if answer else "🔇 No response recorded")
 
+        # Add processing indicator
+        print("\n⏳ Analyzing your answer...")
         feedback, next_difficulty = analyze_answer(question, answer)
+
+        # Show feedback first
         print(f"\n✅ Feedback: {feedback}")
+
+        # Then speak it after 1 second
+        time.sleep(1)
         speak(feedback)
-        time.sleep(1)  # Pause after feedback
 
         difficulty = next_difficulty
+        time.sleep(2)  # Pause before next question
 
     print("\n🎯 Interview Complete!")
 
