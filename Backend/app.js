@@ -5,6 +5,7 @@ const connectDB = require("./config/db.js");
 const authRoutes = require("./routes/authRoutes.js");
 const pdfRoutes = require("./routes/pdfRoutes.js");
 const userRoutes = require("./routes/userRoutes.js");
+const interviewRoutes = require("./routes/interviewRoutes.js");
 
 dotenv.config();
 const app = express();
@@ -20,6 +21,7 @@ connectDB();
 app.use("/api/auth", authRoutes);
 app.use("/api/pdf", pdfRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/interview", interviewRoutes);
 
 // Instead of app.listen, export the app
 module.exports = app;

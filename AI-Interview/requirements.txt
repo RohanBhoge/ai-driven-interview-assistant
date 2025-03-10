@@ -1,0 +1,6 @@
+google-generativeai
+PyPDF2
+python-dotenv
+speechrecognition
+gTTS
+pygame
