@@ -56,31 +56,45 @@ def speak(text):
         print(json.dumps({"error": f"Audio error: {e}"}), file=sys.stderr)
 
 
+import speech_recognition as sr
+import json
+import sys
+
 def listen():
-    """Capture voice input with better pause handling"""
+    recognizer = sr.Recognizer()
+    
     with sr.Microphone() as source:
         recognizer.adjust_for_ambient_noise(source)
-        recognizer.pause_threshold = 1.5  # Allow longer pauses
-        recognizer.energy_threshold = 4000  # Adjust for background noise
+        recognizer.pause_threshold = 1.5
+        recognizer.energy_threshold = 4000
 
         try:
-            # Increased timeouts for better capture
-            audio = recognizer.listen(
-                source,
-                timeout=10,  # Wait 10s for speech to start
-                phrase_time_limit=30,  # Allow 30s answers
-            )
+            print(json.dumps({"status": "Listening for answer..."}))  # Inform Node.js
+            sys.stdout.flush()  # Ensure message is sent to Node.js
+            
+            audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)  # Set time limits
+
+            print(json.dumps({"status": "Processing answer..."}))
+            sys.stdout.flush()
+            
             text = recognizer.recognize_google(audio)
             return text
+        
         except sr.WaitTimeoutError:
+            print(json.dumps({"error": "Listening timeout, no response received."}))
+            sys.stdout.flush()
             return ""
+        
         except sr.UnknownValueError:
+            print(json.dumps({"error": "Could not understand audio."}))
+            sys.stdout.flush()
             return ""
+        
         except Exception as e:
-            print(
-                json.dumps({"error": f"Voice recognition error: {e}"}), file=sys.stderr
-            )
+            print(json.dumps({"error": f"Voice recognition error: {e}"}), file=sys.stderr)
+            sys.stdout.flush()
             return ""
+
 
 
 def ask_question(resume_text, difficulty="medium"):
@@ -136,23 +150,17 @@ def analyze_answer(question, answer):
         print(json.dumps({"error": f"Error analyzing answer: {e}"}), file=sys.stderr)
         return "Error analyzing your answer. Please try again.", "same"
 
-import sys
-
 
 def main():
-    print("Starting interview...", file=sys.stderr)
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "Resume file path is required"}), file=sys.stderr)
+        print(json.dumps({"error": "Resume text is required"}), file=sys.stderr)
         sys.exit(1)
 
-    resume_file = sys.argv[1]
-    with open(resume_file, "r") as file:
-        resume_text = file.read()
-
+    resume_text = sys.argv[1]  # Use the argument directly as resume text
     difficulty = "medium"
     results = []
 
-    for i in range(3):  # Ask 3 questions
+    for i in range(1):  # Ask 1 question
         print(f"Processing question {i + 1}...", file=sys.stderr)
         question = ask_question(resume_text, difficulty)
         if not question:
@@ -161,9 +169,9 @@ def main():
 
         results.append({"type": "question", "text": question, "step": i + 1})
 
-        # Speak the question (but don't print to stdout)
-        speak(question)  # Speak the question aloud
-        time.sleep(2)  # Pause after speaking the question
+        # Speak the question
+        speak(question)
+        time.sleep(2)
 
         # Capture answer
         print("Listening for answer...", file=sys.stderr)
@@ -175,21 +183,20 @@ def main():
         print("Analyzing answer...", file=sys.stderr)
         feedback, next_difficulty = analyze_answer(question, answer)
 
-        # Add feedback to results
         results.append(
             {"type": "feedback", "text": feedback, "nextDifficulty": next_difficulty}
         )
 
-        # Speak feedback (but don't print to stdout)
-        speak(feedback)  # Speak the feedback aloud
-        time.sleep(2)  # Pause after speaking feedback
+        # Speak feedback
+        speak(feedback)
+        time.sleep(2)
 
-        # Update difficulty for next question
         difficulty = next_difficulty
 
-    # Output results as JSON
-    print(json.dumps(results), file=sys.stderr)
-    print(json.dumps(results))  # Print JSON to stdout for Node.js
+    # Print JSON result
+    print(json.dumps(results))  # Print JSON output
+
+    sys.exit(0)  # ✅ Ensure the script exits
 
 
 if __name__ == "__main__":

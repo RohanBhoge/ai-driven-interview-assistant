@@ -5,41 +5,69 @@ exports.startInterview = async (req, res) => {
   try {
     const { resumeText } = req.body;
 
-    // Path to your Python script
     const pythonScript = path.join(
       __dirname,
       "../../AI-Interview/interview.py"
     );
 
-    // Options for PythonShell
     const options = {
-      mode: "json", // Expect JSON output
       pythonOptions: ["-u"], // Unbuffered output
-      args: [resumeText], // Pass resume text to Python
+      args: [resumeText],
     };
+
     console.log("Starting Python script...");
 
-    // Run Python script
-    PythonShell.run(pythonScript, options, (err, results) => {
+    let resultData = [];
+    let responseSent = false; // Flag to track if response is already sent
+
+    const shell = new PythonShell(pythonScript, options);
+
+    shell.on("message", (message) => {
+      try {
+        const parsedMessage = JSON.parse(message);
+
+        if (parsedMessage.error) {
+          console.error("Python error:", parsedMessage.error);
+
+          if (!responseSent) {
+            responseSent = true;
+            shell.terminate(); // Stop script
+            return res
+              .status(400)
+              .json({ success: false, error: parsedMessage.error });
+          }
+        }
+
+        console.log("Python message:", parsedMessage);
+        resultData.push(parsedMessage);
+      } catch (error) {
+        console.error("Invalid JSON from Python:", message);
+      }
+    });
+
+    shell.on("stderr", (stderr) => {
+      console.error("Python stderr:", stderr);
+    });
+
+    shell.end((err) => {
       if (err) {
-        console.error("Python error:", err);
-        return res.status(500).json({ error: "AI service failed" });
+        console.error("Python script error:", err);
+        if (!responseSent) {
+          responseSent = true;
+          return res.status(500).json({ error: "AI service failed" });
+        }
       }
-      console.log("Python script completed. Results:", results);
 
-      // Check if results are valid JSON
-      if (!results || !Array.isArray(results)) {
-        return res
-          .status(500)
-          .json({ error: "Invalid response from AI service" });
+      if (!responseSent) {
+        responseSent = true;
+        console.log("Python script completed. Sending response...");
+        res.status(200).json({ success: true, data: resultData });
       }
-      console.log("Sending response to client...");
-
-      // Send results back to frontend
-      res.status(200).json({ success: true, data: results });
     });
   } catch (error) {
     console.error("Error starting interview:", error);
-    res.status(500).json({ error: "Internal server error" });
+    if (!responseSent) {
+      res.status(500).json({ error: "Internal server error" });
+    }
   }
 };
