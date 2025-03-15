@@ -1,9 +1,12 @@
 const { PythonShell } = require("python-shell");
 const path = require("path");
 
+const { PythonShell } = require("python-shell");
+const path = require("path");
+
 exports.startInterview = async (req, res) => {
   try {
-    const { resumeText } = req.body;
+    const { resumeText } = req.query; // Use query parameters for GET requests
 
     const pythonScript = path.join(
       __dirname,
@@ -17,8 +20,11 @@ exports.startInterview = async (req, res) => {
 
     console.log("Starting Python script...");
 
-    let resultData = [];
-    let responseSent = false; // Flag to track if response is already sent
+    // Set headers for Server-Sent Events (SSE)
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders(); // Flush headers to establish SSE connection
 
     const shell = new PythonShell(pythonScript, options);
 
@@ -28,18 +34,21 @@ exports.startInterview = async (req, res) => {
 
         if (parsedMessage.error) {
           console.error("Python error:", parsedMessage.error);
-
-          if (!responseSent) {
-            responseSent = true;
-            shell.terminate(); // Stop script
-            return res
-              .status(400)
-              .json({ success: false, error: parsedMessage.error });
-          }
+          res.write(
+            `data: ${JSON.stringify({
+              success: false,
+              error: parsedMessage.error,
+            })}\n\n`
+          );
+          res.end(); // End the response
+          shell.terminate(); // Stop script
+          return;
         }
 
         console.log("Python message:", parsedMessage);
-        resultData.push(parsedMessage);
+
+        // Send each message to the frontend in real-time
+        res.write(`data: ${JSON.stringify(parsedMessage)}\n\n`);
       } catch (error) {
         console.error("Invalid JSON from Python:", message);
       }
@@ -52,22 +61,46 @@ exports.startInterview = async (req, res) => {
     shell.end((err) => {
       if (err) {
         console.error("Python script error:", err);
-        if (!responseSent) {
-          responseSent = true;
-          return res.status(500).json({ error: "AI service failed" });
-        }
+        res.write(
+          `data: ${JSON.stringify({
+            success: false,
+            error: "AI service failed",
+          })}\n\n`
+        );
+        res.end(); // End the response
+        return;
       }
 
-      if (!responseSent) {
-        responseSent = true;
-        console.log("Python script completed. Sending response...");
-        res.status(200).json({ success: true, data: resultData });
-      }
+      console.log("Python script completed. Sending final response...");
+      res.write(
+        `data: ${JSON.stringify({
+          success: true,
+          message: "Interview completed",
+        })}\n\n`
+      );
+      res.end(); // End the response
     });
   } catch (error) {
     console.error("Error starting interview:", error);
-    if (!responseSent) {
-      res.status(500).json({ error: "Internal server error" });
-    }
+    res.write(
+      `data: ${JSON.stringify({
+        success: false,
+        error: "Internal server error",
+      })}\n\n`
+    );
+    res.end(); // End the response
+  }
+};
+exports.submitAnswer = async (req, res) => {
+  try {
+    const { questionId, answer } = req.body;
+
+    // Analyze the answer (use your existing `analyze_answer` function)
+    const feedback = await analyzeAnswer(questionId, answer);
+
+    res.status(200).json({ success: true, feedback });
+  } catch (error) {
+    console.error("Error submitting answer:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };

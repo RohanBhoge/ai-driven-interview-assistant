@@ -1,25 +1,65 @@
 import { useState } from "react";
 import axios from "axios";
+import { useAuth } from "../context/AuthContext";
+import { useInterview } from "../context/InterviewContext";
 // import { useNavigate } from "react-router-dom";
 
 const InterviewPage = () => {
   const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const { token } = useAuth();
+  const { text } = useInterview();
   //   const navigate = useNavigate();
 
   const startInterview = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.post("/api/interview/start-interview", {
-        resumeText: "Your resume text here", // Replace with actual resume text
-      });
+      const response = await axios.post(
+        "http://localhost:5000/api/interview/start-interview",
+        {
+          resumeText: text,
+        },
+        {
+          headers: {
+            "x-auth-token": token,
+          },
+        }
+      );
       setQuestions(response.data.data);
+      console.log(response.data.data);
     } catch (error) {
       console.error("Error starting interview:", error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const eventSource = new EventSource(
+    "http://localhost:5000/api/interview/start-interview"
+  ); // Replace with your API endpoint
+
+  eventSource.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.error) {
+      console.error("Error:", data.error);
+      // Display error on the screen
+    } else if (data.type === "question") {
+      console.log("Question:", data.text);
+      // Display the question on the screen
+    } else if (data.type === "feedback") {
+      console.log("Feedback:", data.text);
+      // Display the feedback on the screen
+    } else if (data.success) {
+      console.log("Interview completed:", data.message);
+      // Display completion message
+    }
+  };
+
+  eventSource.onerror = (error) => {
+    console.error("EventSource failed:", error);
+    eventSource.close(); // Close the connection
   };
 
   return (

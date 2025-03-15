@@ -4,7 +4,6 @@ import contextlib
 import json
 import time
 import tempfile
-from PyPDF2 import PdfReader
 from dotenv import load_dotenv
 import speech_recognition as sr
 from gtts import gTTS
@@ -56,45 +55,45 @@ def speak(text):
         print(json.dumps({"error": f"Audio error: {e}"}), file=sys.stderr)
 
 
-import speech_recognition as sr
-import json
-import sys
-
 def listen():
+    """Listen to user's voice input and convert it to text"""
     recognizer = sr.Recognizer()
-    
+
     with sr.Microphone() as source:
         recognizer.adjust_for_ambient_noise(source)
         recognizer.pause_threshold = 1.5
         recognizer.energy_threshold = 4000
 
         try:
-            print(json.dumps({"status": "Listening for answer..."}))  # Inform Node.js
-            sys.stdout.flush()  # Ensure message is sent to Node.js
-            
-            audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)  # Set time limits
+            print(json.dumps({"status": "Listening for answer..."}))  # Inform frontend
+            sys.stdout.flush()  # Ensure message is sent to frontend
+
+            audio = recognizer.listen(
+                source, timeout=5, phrase_time_limit=10
+            )  # Set time limits
 
             print(json.dumps({"status": "Processing answer..."}))
             sys.stdout.flush()
-            
+
             text = recognizer.recognize_google(audio)
             return text
-        
+
         except sr.WaitTimeoutError:
             print(json.dumps({"error": "Listening timeout, no response received."}))
             sys.stdout.flush()
             return ""
-        
+
         except sr.UnknownValueError:
             print(json.dumps({"error": "Could not understand audio."}))
             sys.stdout.flush()
             return ""
-        
+
         except Exception as e:
-            print(json.dumps({"error": f"Voice recognition error: {e}"}), file=sys.stderr)
+            print(
+                json.dumps({"error": f"Voice recognition error: {e}"}), file=sys.stderr
+            )
             sys.stdout.flush()
             return ""
-
 
 
 def ask_question(resume_text, difficulty="medium"):
@@ -107,7 +106,7 @@ def ask_question(resume_text, difficulty="medium"):
     """
     try:
         response = model.generate_content(prompt)
-        question = response.text
+        question = response.text.strip()
         return question
     except Exception as e:
         print(json.dumps({"error": f"Error generating question: {e}"}), file=sys.stderr)
@@ -137,7 +136,7 @@ def analyze_answer(question, answer):
     """
     try:
         response = model.generate_content(prompt)
-        feedback = response.text
+        feedback = response.text.strip()
 
         # Extract the difficulty adjustment from the feedback
         if "Next: HARDER" in feedback:
@@ -160,32 +159,46 @@ def main():
     difficulty = "medium"
     results = []
 
-    for i in range(1):  # Ask 1 question
+    for i in range(1):  # Ask 3 questions
         print(f"Processing question {i + 1}...", file=sys.stderr)
+
+        # Generate question
         question = ask_question(resume_text, difficulty)
         if not question:
             results.append({"error": "Failed to generate question"})
             continue
 
-        results.append({"type": "question", "text": question, "step": i + 1})
+        # Display question on frontend
+        print(json.dumps({"type": "question", "text": question, "step": i + 1}))
+        sys.stdout.flush()
 
         # Speak the question
         speak(question)
         time.sleep(2)
 
         # Capture answer
-        print("Listening for answer...", file=sys.stderr)
+        print(json.dumps({"status": "Listening for answer..."}))
+        sys.stdout.flush()
         answer = listen()
         if not answer:
             answer = "No response detected."
 
         # Analyze answer
-        print("Analyzing answer...", file=sys.stderr)
+        print(json.dumps({"status": "Analyzing answer..."}))
+        sys.stdout.flush()
         feedback, next_difficulty = analyze_answer(question, answer)
 
-        results.append(
-            {"type": "feedback", "text": feedback, "nextDifficulty": next_difficulty}
+        # Display feedback on frontend
+        print(
+            json.dumps(
+                {
+                    "type": "feedback",
+                    "text": feedback,
+                    "nextDifficulty": next_difficulty,
+                }
+            )
         )
+        sys.stdout.flush()
 
         # Speak feedback
         speak(feedback)
@@ -193,7 +206,7 @@ def main():
 
         difficulty = next_difficulty
 
-    # Print JSON result
+    # Print final JSON result
     print(json.dumps(results))  # Print JSON output
 
     sys.exit(0)  # ✅ Ensure the script exits

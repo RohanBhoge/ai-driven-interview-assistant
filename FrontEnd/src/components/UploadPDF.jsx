@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 import "./UploadPDF.css"; // Ensure you have this CSS file
 import { useAuth } from "../context/AuthContext";
 import Navbar from "./Navbar";
+import { useInterview } from "../context/InterviewContext";
 
 const UploadPDF = () => {
+  const { text, setText } = useInterview();
   const [file, setFile] = useState(null);
-  const [text, setText] = useState("");
   const { token } = useAuth();
 
   const handleFileChange = (e) => {
@@ -34,7 +35,10 @@ const UploadPDF = () => {
           },
         }
       );
-      setText(response.data.text);
+
+      localStorage.setItem("text", response.data.text);
+      setText(localStorage.getItem("text"));
+      alert("Resume text extracted successfully.");
     } catch (error) {
       console.error("Error uploading file:", error);
       alert("Failed to upload and extract text.");
