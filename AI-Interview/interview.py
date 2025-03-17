@@ -159,7 +159,7 @@ def main():
     difficulty = "medium"
     results = []
 
-    for i in range(1):  # Ask 3 questions
+    for i in range(2):  # Ask 3 questions
         print(f"Processing question {i + 1}...", file=sys.stderr)
 
         # Generate question

@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { useInterview } from "../context/InterviewContext";
-// import { useNavigate } from "react-router-dom";
 
 const InterviewPage = () => {
   const [questions, setQuestions] = useState([]);
@@ -10,7 +9,43 @@ const InterviewPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { token } = useAuth();
   const { text } = useInterview();
-  //   const navigate = useNavigate();
+
+  // Initialize EventSource only once
+  useEffect(() => {
+    const eventSource = new EventSource(
+      `http://localhost:5000/api/interview/start-interview?resumeText=${encodeURIComponent(
+        text
+      )}`
+    );
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.error) {
+        console.error("Error:", data.error);
+        // Display error on the screen
+      } else if (data.type === "question") {
+        console.log("Question:", data.text);
+        setQuestions((prev) => [...prev, data]); // Add question to the list
+      } else if (data.type === "feedback") {
+        console.log("Feedback:", data.text);
+        // Display feedback on the screen
+      } else if (data.success) {
+        console.log("Interview completed:", data.message);
+        eventSource.close(); // Close the connection
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error("EventSource failed:", error);
+      eventSource.close(); // Close the connection
+    };
+
+    // Cleanup function to close EventSource when the component unmounts
+    return () => {
+      eventSource.close();
+    };
+  }, [text]); // Re-run effect if `text` changes
 
   const startInterview = async () => {
     setIsLoading(true);
@@ -33,33 +68,6 @@ const InterviewPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const eventSource = new EventSource(
-    "http://localhost:5000/api/interview/start-interview"
-  ); // Replace with your API endpoint
-
-  eventSource.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-
-    if (data.error) {
-      console.error("Error:", data.error);
-      // Display error on the screen
-    } else if (data.type === "question") {
-      console.log("Question:", data.text);
-      // Display the question on the screen
-    } else if (data.type === "feedback") {
-      console.log("Feedback:", data.text);
-      // Display the feedback on the screen
-    } else if (data.success) {
-      console.log("Interview completed:", data.message);
-      // Display completion message
-    }
-  };
-
-  eventSource.onerror = (error) => {
-    console.error("EventSource failed:", error);
-    eventSource.close(); // Close the connection
   };
 
   return (

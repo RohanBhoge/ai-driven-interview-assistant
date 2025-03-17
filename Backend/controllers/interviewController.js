@@ -1,9 +1,6 @@
 const { PythonShell } = require("python-shell");
 const path = require("path");
 
-const { PythonShell } = require("python-shell");
-const path = require("path");
-
 exports.startInterview = async (req, res) => {
   try {
     const { resumeText } = req.query; // Use query parameters for GET requests
