@@ -8,8 +8,11 @@ const InterviewPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { token } = useAuth();
   const { text } = useInterview();
+  const [interviewStarted, setInterviewStarted] = useState(false); // Track interview start
 
   useEffect(() => {
+    if (!interviewStarted) return; // Prevent auto-start
+
     const eventSource = new EventSource(
       `http://localhost:5000/api/interview/start-interview?resumeText=${encodeURIComponent(
         text
@@ -23,7 +26,7 @@ const InterviewPage = () => {
         console.error("Error:", data.error);
       } else if (data.type === "question") {
         console.log("Question:", data.text);
-        setCurrentQuestion(data); // Update only the current question
+        setCurrentQuestion(data);
       } else if (data.type === "feedback") {
         console.log("Feedback:", data.text);
       } else if (data.success) {
@@ -40,7 +43,7 @@ const InterviewPage = () => {
     return () => {
       eventSource.close();
     };
-  }, [text]);
+  }, [text, interviewStarted]); // Dependency includes `interviewStarted`
 
   const startInterview = async () => {
     setIsLoading(true);
@@ -50,7 +53,8 @@ const InterviewPage = () => {
         { resumeText: text },
         { headers: { "x-auth-token": token } }
       );
-      setCurrentQuestion(response.data.data[0]); // Set the first question
+      setCurrentQuestion(response.data.data[0]);
+      setInterviewStarted(true); // Now allow eventSource to start
     } catch (error) {
       console.error("Error starting interview:", error);
     } finally {
