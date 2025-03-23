@@ -6,7 +6,8 @@
   justify-content: center;
   text-align: center;
   padding: 4rem 2rem;
-  background-color: #f8f9fa;
+  border: 3px solid #712121;
+    border-radius: 20px;
 }
 
 .hero-section h1 {
@@ -17,7 +18,7 @@
 
 .hero-section p {
   font-size: 1.6rem;
-  color: #22c55e;
+  color:rgb(27 24 25);;
   font-weight: 700;
   margin-bottom: 2rem;
 }
@@ -44,4 +45,20 @@
   .hero-section p {
     font-size: 1rem;
   }
+}
+.hero-section button{
+  background: linear-gradient(135deg, #060505, #8b2261); /* Gradient background */
+    color: white; /* Text color */
+    border: none; /* Remove default border */
+    padding: 12px 30px; /* Inside spacing */
+    font-size: 18px; /* Font size */
+    font-weight: bold; /* Make text bold */
+    text-transform: uppercase; /* Uppercase text */
+    border-radius: 30px; /* Rounded corners */
+    cursor: pointer; /* Pointer on hover */
+    transition: all 0.3s ease-in-out; /* Smooth transition */
+    box-shadow: 0px 5px 15px rgba(255, 107, 107, 0.4); /* Soft shadow */
+    outline: none; /* Remove outline */
+    display: inline-block;
+    letter-spacing: 1px;
 }
