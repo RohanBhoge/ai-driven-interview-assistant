@@ -151,65 +151,61 @@ def analyze_answer(question, answer):
 
 
 def main():
+    print("Python script started...", file=sys.stderr)
+    sys.stderr.flush()
+
     if len(sys.argv) < 2:
         print(json.dumps({"error": "Resume text is required"}), file=sys.stderr)
         sys.exit(1)
 
-    resume_text = sys.argv[1]  # Use the argument directly as resume text
+    resume_text = sys.argv[1]
     difficulty = "medium"
     results = []
 
-    for i in range(2):  # Ask 3 questions
-        print(f"Processing question {i + 1}...", file=sys.stderr)
+    for i in range(5):  # Ask 5 questions for testing
+        print(f"Asking question {i + 1}...", file=sys.stderr)
+        sys.stderr.flush()
 
-        # Generate question
         question = ask_question(resume_text, difficulty)
         if not question:
             results.append({"error": "Failed to generate question"})
             continue
 
-        # Display question on frontend
-        print(json.dumps({"type": "question", "text": question, "step": i + 1}))
+        print(
+            json.dumps({"question": question}), file=sys.stdout
+        )  # Send question to backend
         sys.stdout.flush()
 
-        # Speak the question
+        print("Generated question:", question, file=sys.stderr)
+        sys.stderr.flush()
+
         speak(question)
         time.sleep(2)
 
-        # Capture answer
-        print(json.dumps({"status": "Listening for answer..."}))
-        sys.stdout.flush()
+        print("Listening for answer...", file=sys.stderr)
+        sys.stderr.flush()
         answer = listen()
-        if not answer:
-            answer = "No response detected."
+        print("Received answer:", answer, file=sys.stderr)
+        sys.stderr.flush()
 
-        # Analyze answer
-        print(json.dumps({"status": "Analyzing answer..."}))
-        sys.stdout.flush()
         feedback, next_difficulty = analyze_answer(question, answer)
 
-        # Display feedback on frontend
         print(
-            json.dumps(
-                {
-                    "type": "feedback",
-                    "text": feedback,
-                    "nextDifficulty": next_difficulty,
-                }
-            )
-        )
+            json.dumps({"feedback": feedback}), file=sys.stdout
+        )  # Send feedback to backend
         sys.stdout.flush()
 
-        # Speak feedback
+        print("Feedback:", feedback, file=sys.stderr)
+        sys.stderr.flush()
+
         speak(feedback)
         time.sleep(2)
 
         difficulty = next_difficulty
 
-    # Print final JSON result
-    print(json.dumps(results))  # Print JSON output
-
-    sys.exit(0)  # ✅ Ensure the script exits
+    print("Python script finished execution.", file=sys.stderr)
+    sys.stderr.flush()
+    sys.exit(0)  # ✅ Ensure it exits properly
 
 
 if __name__ == "__main__":

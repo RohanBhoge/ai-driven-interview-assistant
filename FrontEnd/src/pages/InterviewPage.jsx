@@ -1,89 +1,116 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useInterview } from "../context/InterviewContext";
 
-const InterviewPage = () => {
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const { token } = useAuth();
-  const { text } = useInterview();
-  const [interviewStarted, setInterviewStarted] = useState(false); // Track interview start
+const StartInterview = () => {
+  const [currentQuestion, setCurrentQuestion] = useState("");
+  const [eventSource, setEventSource] = useState(null);
+  const [interviewStarted, setInterviewStarted] = useState(false);
+  const { userId, token } = useAuth(); // Get the userId and token from the context
+  const { text } = useInterview(); // Get the resume text from the context
 
-  useEffect(() => {
-    if (!interviewStarted) return; // Prevent auto-start
+  const handleStartInterview = async () => {
+    if (!text) {
+      alert("Please enter your resume text.");
+      return;
+    }
 
-    const eventSource = new EventSource(
-      `http://localhost:5000/api/interview/start-interview?resumeText=${encodeURIComponent(
-        text
-      )}`
-    );
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.error) {
-        console.error("Error:", data.error);
-      } else if (data.type === "question") {
-        console.log("Question:", data.text);
-        setCurrentQuestion(data);
-      } else if (data.type === "feedback") {
-        console.log("Feedback:", data.text);
-      } else if (data.success) {
-        console.log("Interview completed:", data.message);
-        eventSource.close();
-      }
-    };
-
-    eventSource.onerror = (error) => {
-      console.error("EventSource failed:", error);
-      eventSource.close();
-    };
-
-    return () => {
-      eventSource.close();
-    };
-  }, [text, interviewStarted]); // Dependency includes `interviewStarted`
-
-  const startInterview = async () => {
-    setIsLoading(true);
     try {
-      const response = await axios.post(
+      // Step 1: Send a POST request to start the interview
+      const response = await fetch(
         "http://localhost:5000/api/interview/start-interview",
-        { resumeText: text },
-        { headers: { "x-auth-token": token } }
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-auth-token": token, // Include the token in the headers
+          },
+          body: JSON.stringify({ userId, resumeText: text }),
+        }
       );
-      setCurrentQuestion(response.data.data[0]);
-      setInterviewStarted(true); // Now allow eventSource to start
+
+      if (!response.ok) {
+        throw new Error("Failed to start interview");
+      }
+
+      // Step 2: Initialize EventSource for real-time updates
+      const eventSource = new EventSource(
+        `http://localhost:5000/api/interview/start-interview-stream?userId=${userId}&resumeText=${encodeURIComponent(
+          text
+        )}&token=${token}` // Pass the token as a query parameter
+      );
+
+      setEventSource(eventSource);
+      setInterviewStarted(true);
+
+      // Listen for messages from the server
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.question) {
+          // Update the current question
+          setCurrentQuestion(data.question);
+        } else if (data.error) {
+          // Handle errors
+          console.error("Error:", data.error);
+          alert("Failed to start interview.");
+          eventSource.close();
+          setInterviewStarted(false);
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error("EventSource error:", error);
+        eventSource.close();
+        setInterviewStarted(false);
+      };
     } catch (error) {
       console.error("Error starting interview:", error);
-    } finally {
-      setIsLoading(false);
+      alert("Failed to start interview.");
     }
   };
 
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">AI Interview</h1>
+  const handleStopInterview = () => {
+    if (eventSource) {
+      eventSource.close();
+      setInterviewStarted(false);
+      setCurrentQuestion("");
+      alert("Interview stopped.");
+    }
+  };
 
-      {!currentQuestion ? (
-        <button
-          onClick={startInterview}
-          disabled={isLoading}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-        >
-          {isLoading ? "Starting..." : "Start Interview"}
-        </button>
-      ) : (
+  // Cleanup EventSource on component unmount
+  useEffect(() => {
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [eventSource]);
+
+  return (
+    <div>
+      <h2>Start a New Interview</h2>
+      <textarea
+        placeholder="Paste your resume text here"
+        value={text}
+        readOnly // Make the textarea read-only since the text is fetched from context
+      />
+      <button onClick={handleStartInterview} disabled={interviewStarted}>
+        Start Interview
+      </button>
+      <button onClick={handleStopInterview} disabled={!interviewStarted}>
+        Stop Interview
+      </button>
+
+      {interviewStarted && currentQuestion && (
         <div>
-          <h2 className="text-xl font-semibold">
-            Question {currentQuestion.step}:
-          </h2>
-          <p className="my-2">{currentQuestion.text}</p>
+          <h3>Current Question</h3>
+          <p>{currentQuestion}</p>
         </div>
       )}
     </div>
   );
 };
 
-export default InterviewPage;
+export default StartInterview;
