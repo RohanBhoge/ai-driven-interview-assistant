@@ -11,7 +11,7 @@ const Login = () => {
     password: "",
   });
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const { login } = useAuth(); // Use the login function from the context
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -32,8 +32,8 @@ const Login = () => {
       );
 
       // Handle successful login
-      console.log("Login successful:", response.data);
-      login(response.data.token); // Store the token
+      console.log("Login successful:", response.data.userId);
+      login(response.data.token, response.data.userId); // Store the token and userId
       navigate("/uploadpdf"); // Redirect to the upload page
     } catch (error) {
       // Handle errors

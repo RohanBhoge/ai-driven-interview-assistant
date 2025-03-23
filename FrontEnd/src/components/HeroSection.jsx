@@ -7,7 +7,7 @@ const HeroSection = () => {
       <h1>All Interviewer to help you get your dream job</h1>
       <p>Practice 2 All Interviews for FREE!</p>
       <Link to="/interview" className="text-white hover:text-gray-300">
-        AI Interview
+        <button>AI Interview</button>
       </Link>
     </div>
   );

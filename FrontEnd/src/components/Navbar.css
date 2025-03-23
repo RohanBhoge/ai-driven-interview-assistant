@@ -3,7 +3,7 @@
   justify-content: space-between;
   align-items: center;
   padding:1rem 2rem;
-  background-color: #ffffff;
+  background-color: #ccb1c1;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .navigation{
@@ -11,6 +11,13 @@
   align-items: center;
   gap: 2rem;
 }
+
+.vsc-initialized{
+  background-color: #ccb1c1;
+}
+
+
+
 
 .log {
   display: flex;
@@ -20,7 +27,7 @@
   
 
   .logo{
-    color:#2563eb;
+    color:#0b0b0b;
     font-family:serif;
     font-size: 1.5rem;
     font-weight: bold;
@@ -36,7 +43,8 @@
 .navbar-link {
   text-decoration: none;
   color: #333;
-  font-weight: 500;
+  font-weight: 1000;
+  font-size: large;
 }
 
 .navbar-link:hover {
