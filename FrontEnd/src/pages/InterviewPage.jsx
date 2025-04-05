@@ -1,116 +1,229 @@
-import React, { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useState, useEffect, useRef } from "react";
+import axios from "axios";
+import "./InterviewPage.css";
 import { useInterview } from "../context/InterviewContext";
+import { EventSourcePolyfill } from "event-source-polyfill";
+import { useAuth } from "../context/AuthContext.jsx";
+const InterviewComponent = () => {
+  const { userId, token } = useAuth();
+  const { text } = useInterview();
+  const [status, setStatus] = useState("Ready to start");
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [currentAnswer, setCurrentAnswer] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [isInterviewActive, setIsInterviewActive] = useState(false);
+  const [error, setError] = useState(null);
+  const [progress, setProgress] = useState("");
+  const [interviewId, setInterviewId] = useState(null);
 
-const StartInterview = () => {
-  const [currentQuestion, setCurrentQuestion] = useState("");
-  const [eventSource, setEventSource] = useState(null);
-  const [interviewStarted, setInterviewStarted] = useState(false);
-  const { userId, token } = useAuth(); // Get the userId and token from the context
-  const { text } = useInterview(); // Get the resume text from the context
+  const eventSourceRef = useRef(null);
 
-  const handleStartInterview = async () => {
-    if (!text) {
-      alert("Please enter your resume text.");
-      return;
-    }
-
+  const startInterview = async () => {
     try {
-      // Step 1: Send a POST request to start the interview
-      const response = await fetch(
-        "http://localhost:5000/api/interview/start-interview",
+      setStatus("Starting interview...");
+      setIsInterviewActive(true);
+      setError(null);
+      setQuestions([]);
+
+      // Close any existing connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+
+      // Create an authenticated SSE connection
+      const source = new EventSourcePolyfill(
+        `/api/interview/start?userId=${userId}&resumeText=${encodeURIComponent(
+          text
+        )}`,
         {
-          method: "POST",
           headers: {
+            "x-auth-token": token,
             "Content-Type": "application/json",
-            "x-auth-token": token, // Include the token in the headers
           },
-          body: JSON.stringify({ userId, resumeText: text }),
+          withCredentials: true,
+          heartbeatTimeout: 60000, // 5 minutes timeout
         }
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to start interview");
-      }
+      eventSourceRef.current = source;
 
-      // Step 2: Initialize EventSource for real-time updates
-      const eventSource = new EventSource(
-        `http://localhost:5000/api/interview/start-interview-stream?userId=${userId}&resumeText=${encodeURIComponent(
-          text
-        )}&token=${token}` // Pass the token as a query parameter
-      );
-
-      setEventSource(eventSource);
-      setInterviewStarted(true);
-
-      // Listen for messages from the server
-      eventSource.onmessage = (event) => {
+      // Handle different types of events
+      source.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        console.log("Received SSE event:", data);
 
-        if (data.question) {
-          // Update the current question
+        if (data.interviewId) {
+          setInterviewId(data.interviewId);
+        }
+
+        if (data.status) {
+          setStatus(data.status);
+        }
+
+        if (data.progress) {
+          setProgress(data.progress);
+        }
+
+        if (data.type === "question" && data.question) {
           setCurrentQuestion(data.question);
-        } else if (data.error) {
-          // Handle errors
-          console.error("Error:", data.error);
-          alert("Failed to start interview.");
-          eventSource.close();
-          setInterviewStarted(false);
+          setQuestions((prevQuestions) => [
+            ...prevQuestions,
+            {
+              question: data.question,
+              difficulty: data.difficulty || "medium",
+              answer: "",
+              feedback: "",
+            },
+          ]);
+        }
+
+        if (data.type === "feedback" && data.feedback) {
+          setFeedback(data.feedback);
+          setQuestions((prevQuestions) => {
+            const updated = [...prevQuestions];
+            if (updated.length > 0) {
+              const lastIndex = updated.length - 1;
+              updated[lastIndex] = {
+                ...updated[lastIndex],
+                feedback: data.feedback,
+              };
+            }
+            return updated;
+          });
+        }
+
+        if (data.type === "error" && data.error) {
+          setError(data.error);
+          source.close();
+        }
+
+        if (data.type === "complete" || data.complete) {
+          setStatus("Interview completed");
+          setIsInterviewActive(false);
+          source.close();
         }
       };
 
-      eventSource.onerror = (error) => {
-        console.error("EventSource error:", error);
-        eventSource.close();
-        setInterviewStarted(false);
+      source.onerror = (event) => {
+        console.error("SSE error:", event);
+        setError("Connection error. Please try again.");
+        setIsInterviewActive(false);
+        source.close();
       };
     } catch (error) {
       console.error("Error starting interview:", error);
-      alert("Failed to start interview.");
+      setError(error.message || "Failed to start interview");
+      setIsInterviewActive(false);
     }
   };
 
-  const handleStopInterview = () => {
-    if (eventSource) {
-      eventSource.close();
-      setInterviewStarted(false);
-      setCurrentQuestion("");
-      alert("Interview stopped.");
-    }
-  };
-
-  // Cleanup EventSource on component unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (eventSource) {
-        eventSource.close();
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
       }
     };
-  }, [eventSource]);
+  }, []);
+
+  // Rest of your component remains the same...
+  const handleUserInput = (e) => {
+    setCurrentAnswer(e.target.value);
+  };
+
+  const submitAnswer = () => {
+    setQuestions((prevQuestions) => {
+      const updated = [...prevQuestions];
+      if (updated.length > 0) {
+        const lastIndex = updated.length - 1;
+        updated[lastIndex] = {
+          ...updated[lastIndex],
+          answer: currentAnswer,
+        };
+      }
+      return updated;
+    });
+    setCurrentAnswer("");
+  };
 
   return (
-    <div>
-      <h2>Start a New Interview</h2>
-      <textarea
-        placeholder="Paste your resume text here"
-        value={text}
-        readOnly // Make the textarea read-only since the text is fetched from context
-      />
-      <button onClick={handleStartInterview} disabled={interviewStarted}>
-        Start Interview
-      </button>
-      <button onClick={handleStopInterview} disabled={!interviewStarted}>
-        Stop Interview
-      </button>
+    <div className="interview-container">
+      <h2>AI Interview Session</h2>
 
-      {interviewStarted && currentQuestion && (
-        <div>
-          <h3>Current Question</h3>
-          <p>{currentQuestion}</p>
+      <div className="status-section">
+        <p>
+          <strong>Status:</strong> {status}
+        </p>
+        {progress && (
+          <p>
+            <strong>Progress:</strong> {progress}
+          </p>
+        )}
+        {error && <p className="error-message">{error}</p>}
+      </div>
+
+      <div className="controls">
+        {!isInterviewActive ? (
+          <button onClick={startInterview}>Start Interview</button>
+        ) : (
+          <button disabled>Interview in Progress</button>
+        )}
+      </div>
+
+      {currentQuestion && (
+        <div className="question-section">
+          <h3>Current Question:</h3>
+          <p className="question">{currentQuestion}</p>
+
+          <div className="answer-input">
+            <textarea
+              placeholder="Your answer..."
+              value={currentAnswer}
+              onChange={handleUserInput}
+              disabled={!isInterviewActive}
+            />
+            <button
+              onClick={submitAnswer}
+              disabled={!isInterviewActive || !currentAnswer.trim()}
+            >
+              Submit Answer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {feedback && (
+        <div className="feedback-section">
+          <h3>Feedback:</h3>
+          <p>{feedback}</p>
+        </div>
+      )}
+
+      {questions.length > 0 && (
+        <div className="history-section">
+          <h3>Interview History:</h3>
+          {questions.map((item, index) => (
+            <div key={index} className="qa-item">
+              <p className="question-history">
+                <strong>Q{index + 1}:</strong> {item.question}
+              </p>
+              {item.answer && (
+                <p className="answer-history">
+                  <strong>A:</strong> {item.answer}
+                </p>
+              )}
+              {item.feedback && (
+                <p className="feedback-history">
+                  <strong>Feedback:</strong> {item.feedback}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 };
 
-export default StartInterview;
+export default InterviewComponent;

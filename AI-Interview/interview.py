@@ -65,32 +65,41 @@ def listen():
         recognizer.energy_threshold = 4000
 
         try:
-            print(json.dumps({"status": "Listening for answer..."}))  # Inform frontend
-            sys.stdout.flush()  # Ensure message is sent to frontend
+            # Send status update to frontend
+            print(json.dumps({"status": "Listening for answer..."}))
+            sys.stdout.flush()  # Force flush to ensure message is sent immediately
 
             audio = recognizer.listen(
                 source, timeout=5, phrase_time_limit=10
             )  # Set time limits
 
+            # Send processing status to frontend
             print(json.dumps({"status": "Processing answer..."}))
             sys.stdout.flush()
 
             text = recognizer.recognize_google(audio)
+            # Send the recognized text to frontend
+            print(json.dumps({"answer": text}))
+            sys.stdout.flush()
             return text
 
         except sr.WaitTimeoutError:
-            print(json.dumps({"error": "Listening timeout, no response received."}))
+            print(json.dumps({"error": "No response received", "status": "Timeout"}))
             sys.stdout.flush()
             return ""
 
         except sr.UnknownValueError:
-            print(json.dumps({"error": "Could not understand audio."}))
+            print(
+                json.dumps({"error": "Could not understand audio", "status": "Failed"})
+            )
             sys.stdout.flush()
             return ""
 
         except Exception as e:
             print(
-                json.dumps({"error": f"Voice recognition error: {e}"}), file=sys.stderr
+                json.dumps(
+                    {"error": f"Voice recognition error: {e}", "status": "Error"}
+                )
             )
             sys.stdout.flush()
             return ""
@@ -105,11 +114,22 @@ def ask_question(resume_text, difficulty="medium"):
     Return ONLY the question (no extra text).  
     """
     try:
+        # Notify that we're generating a question
+        print(json.dumps({"status": "Generating question..."}))
+        sys.stdout.flush()
+
         response = model.generate_content(prompt)
         question = response.text.strip()
+
+        # Send the generated question immediately
+        print(json.dumps({"question": question, "difficulty": difficulty}))
+        sys.stdout.flush()
         return question
     except Exception as e:
-        print(json.dumps({"error": f"Error generating question: {e}"}), file=sys.stderr)
+        print(
+            json.dumps({"error": f"Error generating question: {e}", "status": "Error"})
+        )
+        sys.stdout.flush()
         return None
 
 
@@ -135,77 +155,85 @@ def analyze_answer(question, answer):
     "Feedback: <your feedback>. Next: <HARDER/SAME/EASIER>"  
     """
     try:
+        # Notify that we're analyzing the answer
+        print(json.dumps({"status": "Analyzing answer..."}))
+        sys.stdout.flush()
+
         response = model.generate_content(prompt)
         feedback = response.text.strip()
 
         # Extract the difficulty adjustment from the feedback
         if "Next: HARDER" in feedback:
-            return feedback, "hard"
+            next_difficulty = "hard"
         elif "Next: EASIER" in feedback:
-            return feedback, "easy"
+            next_difficulty = "easy"
         else:
-            return feedback, "same"
+            next_difficulty = "medium"
+
+        # Send feedback immediately
+        print(json.dumps({"feedback": feedback, "nextDifficulty": next_difficulty}))
+        sys.stdout.flush()
+
+        return feedback, next_difficulty
     except Exception as e:
-        print(json.dumps({"error": f"Error analyzing answer: {e}"}), file=sys.stderr)
-        return "Error analyzing your answer. Please try again.", "same"
+        print(json.dumps({"error": f"Error analyzing answer: {e}", "status": "Error"}))
+        sys.stdout.flush()
+        return "Error analyzing your answer. Please try again.", "medium"
 
 
 def main():
-    print("Python script started...", file=sys.stderr)
-    sys.stderr.flush()
+    print(json.dumps({"status": "Starting interview process"}))
+    sys.stdout.flush()
 
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "Resume text is required"}), file=sys.stderr)
+        print(json.dumps({"error": "Resume text is required"}))
+        sys.stdout.flush()
         sys.exit(1)
 
     resume_text = sys.argv[1]
     difficulty = "medium"
-    results = []
+    interview_data = {"questions": [], "answers": [], "feedback": []}
 
     for i in range(5):  # Ask 5 questions for testing
-        print(f"Asking question {i + 1}...", file=sys.stderr)
-        sys.stderr.flush()
+        # Send interview progress info
+        print(json.dumps({"progress": f"Question {i+1}/5", "questionNumber": i + 1}))
+        sys.stdout.flush()
 
         question = ask_question(resume_text, difficulty)
         if not question:
-            results.append({"error": "Failed to generate question"})
             continue
 
-        print(
-            json.dumps({"question": question}), file=sys.stdout
-        )  # Send question to backend
-        sys.stdout.flush()
+        # Add to interview data
+        interview_data["questions"].append(question)
 
-        print("Generated question:", question, file=sys.stderr)
-        sys.stderr.flush()
-
+        # Speak the question
         speak(question)
-        time.sleep(2)
+        time.sleep(1)
 
-        print("Listening for answer...", file=sys.stderr)
-        sys.stderr.flush()
+        # Listen for answer
         answer = listen()
-        print("Received answer:", answer, file=sys.stderr)
-        sys.stderr.flush()
 
-        feedback, next_difficulty = analyze_answer(question, answer)
+        if answer:
+            interview_data["answers"].append(answer)
+            feedback, next_difficulty = analyze_answer(question, answer)
+            interview_data["feedback"].append(feedback)
 
-        print(
-            json.dumps({"feedback": feedback}), file=sys.stdout
-        )  # Send feedback to backend
-        sys.stdout.flush()
+            # Speak the feedback
+            speak(feedback)
+            time.sleep(1)
 
-        print("Feedback:", feedback, file=sys.stderr)
-        sys.stderr.flush()
+            difficulty = next_difficulty
+        else:
+            interview_data["answers"].append("No answer provided")
+            interview_data["feedback"].append(
+                "No feedback available due to missing answer"
+            )
 
-        speak(feedback)
-        time.sleep(2)
+    # Send interview completion notification
+    print(json.dumps({"status": "Interview completed", "complete": True}))
+    sys.stdout.flush()
 
-        difficulty = next_difficulty
-
-    print("Python script finished execution.", file=sys.stderr)
-    sys.stderr.flush()
-    sys.exit(0)  # ✅ Ensure it exits properly
+    sys.exit(0)
 
 
 if __name__ == "__main__":

@@ -13,12 +13,21 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+// In your CORS configuration (app.js)
 app.use(
   cors({
-    origin: "http://localhost:5173", // Replace with your frontend URL
+    origin: "http://localhost:5173",
     credentials: true,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "x-auth-token"],
   })
 );
+
+// Add this before your routes
+app.use((req, res, next) => {
+  res.header("Access-Control-Expose-Headers", "x-auth-token");
+  next();
+});
 
 // Database connection
 connectDB();

@@ -26,7 +26,7 @@ const authMiddleware = require("../middleware/authMiddleware.js");
 const router = express.Router();
 
 // Protected routes
-router.post("/start-interview", authMiddleware, startInterview);
+router.get("/start", authMiddleware, startInterview);
 router.get("/start-interview-stream", startInterviewStream);
 router.post("/submit-answers", authMiddleware, submitAnswers);
 router.get("/user-interviews/:userId", authMiddleware, getUserInterviews);
