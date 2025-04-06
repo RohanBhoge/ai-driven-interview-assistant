@@ -194,7 +194,7 @@ def main():
     difficulty = "medium"
     interview_data = {"questions": [], "answers": [], "feedback": []}
 
-    for i in range(5):  # Ask 5 questions for testing
+    for i in range(2):  # Ask 5 questions for testing
         # Send interview progress info
         print(json.dumps({"progress": f"Question {i+1}/5", "questionNumber": i + 1}))
         sys.stdout.flush()

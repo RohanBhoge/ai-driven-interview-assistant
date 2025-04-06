@@ -39,6 +39,7 @@ exports.startInterview = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    debugger;
     const lastInterview = await Interview.findOne({ userId }).sort({
       interviewNumber: -1,
     });
@@ -96,30 +97,35 @@ exports.startInterview = async (req, res) => {
     // }, 120000);
 
     // Message handling
-    shell.on("message", (message) => {
+    shell.on("message", async (message) => {
       try {
         const parsedMessage = JSON.parse(message);
+        console.log("Received message from Python:", parsedMessage);
+
+        // Add timestamp to all messages
         parsedMessage.timestamp = new Date().toISOString();
 
-        // Determine message type
+        // Handle different message types
         if (parsedMessage.question) {
+          // New question received - create complete question object
           parsedMessage.type = "question";
-          interview.questions.push({
+          const newQuestion = {
             question: parsedMessage.question,
             difficulty: parsedMessage.difficulty || "medium",
-          });
-        } else if (parsedMessage.answer) {
+            answer: "", // Initialize empty answer
+            feedback: "", // Initialize empty feedback
+          };
+          interview.questions.push(newQuestion);
+        } else if (parsedMessage.answer && interview.questions.length > 0) {
+          // Answer received - update last question's answer
           parsedMessage.type = "answer";
-          if (interview.questions.length > 0) {
-            interview.questions[interview.questions.length - 1].answer =
-              parsedMessage.answer;
-          }
-        } else if (parsedMessage.feedback) {
+          const lastIndex = interview.questions.length - 1;
+          interview.questions[lastIndex].answer = parsedMessage.answer;
+        } else if (parsedMessage.feedback && interview.questions.length > 0) {
+          // Feedback received - update last question's feedback
           parsedMessage.type = "feedback";
-          if (interview.questions.length > 0) {
-            interview.questions[interview.questions.length - 1].feedback =
-              parsedMessage.feedback;
-          }
+          const lastIndex = interview.questions.length - 1;
+          interview.questions[lastIndex].feedback = parsedMessage.feedback;
         } else if (parsedMessage.error) {
           parsedMessage.type = "error";
         } else if (parsedMessage.status) {
@@ -128,29 +134,36 @@ exports.startInterview = async (req, res) => {
           parsedMessage.type = "progress";
         }
 
-        // Save to DB and send to client
-        interview
-          .save()
-          .catch((err) => console.error("Error saving interview:", err));
+        // Save to database with error handling
+        try {
+          await interview.save();
+        } catch (err) {
+          if (err.name !== "ParallelSaveError") {
+            console.error("Error saving interview:", err);
+          }
+        }
+
+        // Forward message to client
         res.write(`data: ${JSON.stringify(parsedMessage)}\n\n`);
 
+        // Handle interview completion
         if (parsedMessage.complete) {
           interview.progress = "Completed";
-          interview
-            .save()
-            .catch((err) => console.error("Error completing interview:", err));
+          interview.completedAt = new Date();
+          await interview.save();
         }
       } catch (error) {
-        console.error("Invalid JSON from Python:", message, error);
+        console.error("Error processing message:", error);
         res.write(
           `data: ${JSON.stringify({
             type: "error",
-            error: "Invalid message format",
+            error: "Error processing message",
+            details: error.message,
           })}\n\n`
         );
       }
     });
-
+    
     // Error handling
     shell.on("stderr", (stderr) => {
       console.error("Python stderr:", stderr);
@@ -164,7 +177,7 @@ exports.startInterview = async (req, res) => {
 
     // Cleanup on script end
     shell.end(async (err) => {
-      clearTimeout(timeout);
+      // clearTimeout(timeout);
 
       if (err) {
         console.error("Python script error:", err);
