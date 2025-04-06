@@ -106,16 +106,30 @@ exports.startInterview = async (req, res) => {
         parsedMessage.timestamp = new Date().toISOString();
 
         // Handle different message types
-        if (parsedMessage.question) {
-          // New question received - create complete question object
+        if (
+          parsedMessage.question &&
+          (!interview.questions.length ||
+            interview.questions[interview.questions.length - 1].question !==
+              parsedMessage.question)
+        ) {
+          // New question received - only add if different from last question
           parsedMessage.type = "question";
           const newQuestion = {
             question: parsedMessage.question,
             difficulty: parsedMessage.difficulty || "medium",
-            answer: "", // Initialize empty answer
-            feedback: "", // Initialize empty feedback
+            answer: "",
+            feedback: "",
           };
           interview.questions.push(newQuestion);
+
+          // Send only question to frontend
+          res.write(
+            `data: ${JSON.stringify({
+              type: "question",
+              question: parsedMessage.question,
+              questionNumber: interview.questions.length,
+            })}\n\n`
+          );
         } else if (parsedMessage.answer && interview.questions.length > 0) {
           // Answer received - update last question's answer
           parsedMessage.type = "answer";
@@ -128,29 +142,34 @@ exports.startInterview = async (req, res) => {
           interview.questions[lastIndex].feedback = parsedMessage.feedback;
         } else if (parsedMessage.error) {
           parsedMessage.type = "error";
-        } else if (parsedMessage.status) {
-          parsedMessage.type = "status";
-        } else if (parsedMessage.progress) {
-          parsedMessage.type = "progress";
+          res.write(`data: ${JSON.stringify(parsedMessage)}\n\n`);
+        } else if (parsedMessage.status || parsedMessage.progress) {
+          // Forward status/progress messages
+          res.write(`data: ${JSON.stringify(parsedMessage)}\n\n`);
         }
 
-        // Save to database with error handling
-        try {
-          await interview.save();
-        } catch (err) {
-          if (err.name !== "ParallelSaveError") {
-            console.error("Error saving interview:", err);
+        // Save to database (only if we made changes)
+        if (["question", "answer", "feedback"].includes(parsedMessage.type)) {
+          try {
+            await interview.save();
+          } catch (err) {
+            if (err.name !== "ParallelSaveError") {
+              console.error("Error saving interview:", err);
+            }
           }
         }
 
-        // Forward message to client
-        res.write(`data: ${JSON.stringify(parsedMessage)}\n\n`);
-
-        // Handle interview completion
+        // Handle completion
         if (parsedMessage.complete) {
           interview.progress = "Completed";
           interview.completedAt = new Date();
           await interview.save();
+          res.write(
+            `data: ${JSON.stringify({
+              type: "complete",
+              message: "Interview completed",
+            })}\n\n`
+          );
         }
       } catch (error) {
         console.error("Error processing message:", error);
@@ -163,7 +182,7 @@ exports.startInterview = async (req, res) => {
         );
       }
     });
-    
+
     // Error handling
     shell.on("stderr", (stderr) => {
       console.error("Python stderr:", stderr);

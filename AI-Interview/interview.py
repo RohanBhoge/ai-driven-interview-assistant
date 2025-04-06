@@ -192,19 +192,20 @@ def main():
 
     resume_text = sys.argv[1]
     difficulty = "medium"
-    interview_data = {"questions": [], "answers": [], "feedback": []}
 
-    for i in range(2):  # Ask 5 questions for testing
-        # Send interview progress info
+    for i in range(2):  # Ask 5 questions
+        # Send progress update
         print(json.dumps({"progress": f"Question {i+1}/5", "questionNumber": i + 1}))
         sys.stdout.flush()
 
+        # Generate and ask question
         question = ask_question(resume_text, difficulty)
         if not question:
             continue
 
-        # Add to interview data
-        interview_data["questions"].append(question)
+        # Send question only once
+        print(json.dumps({"question": question, "difficulty": difficulty}))
+        sys.stdout.flush()
 
         # Speak the question
         speak(question)
@@ -212,27 +213,25 @@ def main():
 
         # Listen for answer
         answer = listen()
+        if not answer:
+            answer = "No answer provided"
 
-        if answer:
-            interview_data["answers"].append(answer)
-            feedback, next_difficulty = analyze_answer(question, answer)
-            interview_data["feedback"].append(feedback)
+        # Send answer (for DB storage only)
+        print(json.dumps({"answer": answer}))
+        sys.stdout.flush()
 
-            # Speak the feedback
-            speak(feedback)
-            time.sleep(1)
+        # Analyze answer (silently)
+        feedback, next_difficulty = analyze_answer(question, answer)
 
-            difficulty = next_difficulty
-        else:
-            interview_data["answers"].append("No answer provided")
-            interview_data["feedback"].append(
-                "No feedback available due to missing answer"
-            )
+        # Send feedback (for DB storage only)
+        print(json.dumps({"feedback": feedback}))
+        sys.stdout.flush()
 
-    # Send interview completion notification
+        difficulty = next_difficulty
+
+    # Interview complete
     print(json.dumps({"status": "Interview completed", "complete": True}))
     sys.stdout.flush()
-
     sys.exit(0)
 
 
