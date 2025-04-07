@@ -17,9 +17,18 @@ const interviewSchema = new mongoose.Schema({
     },
   ],
   finalFeedback: {
-    strengths: { type: String, default: "" },
-    weaknesses: { type: String, default: "" },
-    suggestions: { type: String, default: "" },
+    strengths: {
+      type: String,
+      default: "",
+    },
+    weaknesses: {
+      type: String,
+      default: "",
+    },
+    suggestions: {
+      type: String,
+      default: "",
+    },
   },
 });
 

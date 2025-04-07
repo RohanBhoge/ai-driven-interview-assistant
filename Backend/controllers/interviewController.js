@@ -9,21 +9,19 @@ exports.startInterview = async (req, res) => {
   try {
     // 1. Verify authentication
     const token = req.headers["x-auth-token"];
-    if (!token) {
-      return res.status(401).json({ error: "No token provided" });
-    }
+    if (!token) return res.status(401).json({ error: "No token provided" });
 
     // 2. Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
 
-    // 3. Get parameters from query (not body for SSE)
+    // 3. Get parameters
     const { userId, resumeText } = req.query;
     if (!userId || !resumeText) {
       return res.status(400).json({ error: "Missing userId or resumeText" });
     }
 
-    // 4. Set proper SSE headers
+    // 4. Set SSE headers
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
@@ -33,13 +31,10 @@ exports.startInterview = async (req, res) => {
     });
     res.flushHeaders();
 
-    // 5. Find the user and create interview
+    // 5. Find user and create interview
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    debugger;
     const lastInterview = await Interview.findOne({ userId }).sort({
       interviewNumber: -1,
     });
@@ -55,9 +50,7 @@ exports.startInterview = async (req, res) => {
     });
     await interview.save();
 
-    if (!Array.isArray(user.interviews)) {
-      user.interviews = [];
-    }
+    if (!Array.isArray(user.interviews)) user.interviews = [];
     user.interviews.push(interview._id);
     await user.save();
 
@@ -83,46 +76,36 @@ exports.startInterview = async (req, res) => {
     console.log("Starting Python script...");
     const shell = new PythonShell(pythonScript, options);
 
-    // Timeout handling
-    // const timeout = setTimeout(() => {
-    //   console.error("Python script timed out");
-    //   res.write(
-    //     `data: ${JSON.stringify({
-    //       type: "error",
-    //       error: "Python script timed out",
-    //     })}\n\n`
-    //   );
-    //   shell.terminate();
-    //   res.end();
-    // }, 120000);
-
-    // Message handling
+    // Message handling with lock mechanism
+    let isProcessing = false;
     shell.on("message", async (message) => {
+      if (isProcessing) return;
+      isProcessing = true;
+
       try {
         const parsedMessage = JSON.parse(message);
         console.log("Received message from Python:", parsedMessage);
 
-        // Add timestamp to all messages
-        parsedMessage.timestamp = new Date().toISOString();
-
-        // Handle different message types
+        // Skip duplicate questions
         if (
           parsedMessage.question &&
-          (!interview.questions.length ||
-            interview.questions[interview.questions.length - 1].question !==
-              parsedMessage.question)
+          interview.questions.length > 0 &&
+          interview.questions[interview.questions.length - 1].question ===
+            parsedMessage.question
         ) {
-          // New question received - only add if different from last question
-          parsedMessage.type = "question";
-          const newQuestion = {
+          isProcessing = false;
+          return;
+        }
+
+        parsedMessage.timestamp = new Date().toISOString();
+
+        if (parsedMessage.question) {
+          interview.questions.push({
             question: parsedMessage.question,
             difficulty: parsedMessage.difficulty || "medium",
             answer: "",
             feedback: "",
-          };
-          interview.questions.push(newQuestion);
-
-          // Send only question to frontend
+          });
           res.write(
             `data: ${JSON.stringify({
               type: "question",
@@ -131,35 +114,26 @@ exports.startInterview = async (req, res) => {
             })}\n\n`
           );
         } else if (parsedMessage.answer && interview.questions.length > 0) {
-          // Answer received - update last question's answer
-          parsedMessage.type = "answer";
           const lastIndex = interview.questions.length - 1;
           interview.questions[lastIndex].answer = parsedMessage.answer;
         } else if (parsedMessage.feedback && interview.questions.length > 0) {
-          // Feedback received - update last question's feedback
-          parsedMessage.type = "feedback";
           const lastIndex = interview.questions.length - 1;
           interview.questions[lastIndex].feedback = parsedMessage.feedback;
-        } else if (parsedMessage.error) {
-          parsedMessage.type = "error";
-          res.write(`data: ${JSON.stringify(parsedMessage)}\n\n`);
-        } else if (parsedMessage.status || parsedMessage.progress) {
-          // Forward status/progress messages
+        } else if (
+          parsedMessage.error ||
+          parsedMessage.status ||
+          parsedMessage.progress
+        ) {
           res.write(`data: ${JSON.stringify(parsedMessage)}\n\n`);
         }
 
-        // Save to database (only if we made changes)
-        if (["question", "answer", "feedback"].includes(parsedMessage.type)) {
-          try {
-            await interview.save();
-          } catch (err) {
-            if (err.name !== "ParallelSaveError") {
-              console.error("Error saving interview:", err);
-            }
-          }
+        // Save only if we have changes
+        if (
+          ["question", "answer", "feedback"].some((type) => parsedMessage[type])
+        ) {
+          await interview.save();
         }
 
-        // Handle completion
         if (parsedMessage.complete) {
           interview.progress = "Completed";
           interview.completedAt = new Date();
@@ -180,6 +154,8 @@ exports.startInterview = async (req, res) => {
             details: error.message,
           })}\n\n`
         );
+      } finally {
+        isProcessing = false;
       }
     });
 
@@ -194,35 +170,139 @@ exports.startInterview = async (req, res) => {
       );
     });
 
-    // Cleanup on script end
+    // Final cleanup and feedback generation
     shell.end(async (err) => {
-      // clearTimeout(timeout);
+      try {
+        if (err) {
+          console.error("Python script error:", err);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              error: "AI service failed: " + err.message,
+            })}\n\n`
+          );
+        }
 
-      if (err) {
-        console.error("Python script error:", err);
-        res.write(
-          `data: ${JSON.stringify({
-            type: "error",
-            error: "AI service failed: " + err.message,
-          })}\n\n`
-        );
+        // Mark interview as completed
+        interview.progress = "Completed";
+        interview.completedAt = new Date();
+        await interview.save();
+
+        // Generate final feedback
+        try {
+          const qaPairs = interview.questions.map((q) => ({
+            question: q.question,
+            answer: q.answer,
+          }));
+
+          const feedbackScript = path.join(
+            __dirname,
+            "../../AI-Interview/interview.py"
+          );
+          const feedbackOptions = {
+            mode: "text",
+            pythonOptions: ["-u"],
+            args: ["--final-feedback", JSON.stringify(qaPairs)],
+          };
+
+          const feedbackShell = new PythonShell(
+            feedbackScript,
+            feedbackOptions
+          );
+
+          // In the shell.end handler, modify the feedbackShell.on('message') part:
+          feedbackShell.on("message", async (feedbackMsg) => {
+            try {
+              let feedback;
+              try {
+                // First try to parse directly
+                feedback = JSON.parse(feedbackMsg);
+              } catch (e) {
+                // If direct parse fails, try cleaning the response
+                const cleaned = feedbackMsg
+                  .replace(/```json/g, "")
+                  .replace(/```/g, "")
+                  .trim();
+                feedback = JSON.parse(cleaned);
+              }
+
+              // Convert arrays to strings if needed
+              const stringifyIfArray = (value) => {
+                if (Array.isArray(value)) {
+                  return value.map((item, i) => `${i + 1}. ${item}`).join("\n");
+                }
+                return value;
+              };
+
+              interview.finalFeedback = {
+                strengths: stringifyIfArray(
+                  feedback.strengths ||
+                    feedback.fallback?.strengths ||
+                    "No strengths identified"
+                ),
+                weaknesses: stringifyIfArray(
+                  feedback.weaknesses ||
+                    feedback.fallback?.weaknesses ||
+                    "No weaknesses identified"
+                ),
+                suggestions: stringifyIfArray(
+                  feedback.suggestions ||
+                    feedback.fallback?.suggestions ||
+                    "No suggestions provided"
+                ),
+              };
+
+              await interview.save();
+
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "complete",
+                  success: true,
+                  message: "Interview completed",
+                  interviewId: interview._id,
+                  finalFeedback: interview.finalFeedback,
+                })}\n\n`
+              );
+            } catch (e) {
+              console.error("Feedback parsing error:", e);
+              // Provide default feedback if all parsing fails
+              interview.finalFeedback = {
+                strengths: "1. Candidate participated in the interview",
+                weaknesses: "1. Technical knowledge needs improvement",
+                suggestions:
+                  "1. Review core concepts\n2. Practice explaining your projects",
+              };
+              await interview.save();
+
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "complete",
+                  success: true,
+                  message: "Interview completed (default feedback used)",
+                  interviewId: interview._id,
+                  finalFeedback: interview.finalFeedback,
+                })}\n\n`
+              );
+            }
+          });
+
+          feedbackShell.end(() => res.end());
+        } catch (feedbackError) {
+          console.error("Feedback generation error:", feedbackError);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "complete",
+              success: true,
+              message: "Interview completed (feedback generation failed)",
+              interviewId: interview._id,
+            })}\n\n`
+          );
+          res.end();
+        }
+      } catch (finalError) {
+        console.error("Final processing error:", finalError);
+        res.end();
       }
-
-      interview.progress = "Completed";
-      await interview
-        .save()
-        .catch((err) => console.error("Error finalizing interview:", err));
-
-      res.write(
-        `data: ${JSON.stringify({
-          type: "complete",
-          success: true,
-          message: "Interview completed",
-          interviewId: interview._id,
-        })}\n\n`
-      );
-
-      res.end();
     });
   } catch (error) {
     console.error("Error starting interview:", error);

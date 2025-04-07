@@ -4,6 +4,8 @@ import "./InterviewPage.css";
 import { useInterview } from "../context/InterviewContext";
 import { EventSourcePolyfill } from "event-source-polyfill";
 import { useAuth } from "../context/AuthContext.jsx";
+import Navbar from "../components/Navbar.jsx";
+
 const InterviewComponent = () => {
   const { userId, token } = useAuth();
   const { text } = useInterview();
@@ -16,6 +18,8 @@ const InterviewComponent = () => {
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState("");
   const [interviewId, setInterviewId] = useState(null);
+  const [finalFeedback, setFinalFeedback] = useState(null); // Add this line
+  const [showFinalFeedback, setShowFinalFeedback] = useState(false); // Add this line
 
   const eventSourceRef = useRef(null);
 
@@ -25,13 +29,13 @@ const InterviewComponent = () => {
       setIsInterviewActive(true);
       setError(null);
       setQuestions([]);
+      setFinalFeedback(null); // Reset final feedback
+      setShowFinalFeedback(false); // Hide final feedback panel
 
-      // Close any existing connection
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
 
-      // Create an authenticated SSE connection
       const source = new EventSourcePolyfill(
         `/api/interview/start?userId=${userId}&resumeText=${encodeURIComponent(
           text
@@ -42,13 +46,12 @@ const InterviewComponent = () => {
             "Content-Type": "application/json",
           },
           withCredentials: true,
-          heartbeatTimeout: 60000, // 5 minutes timeout
+          heartbeatTimeout: 60000,
         }
       );
 
       eventSourceRef.current = source;
 
-      // Handle different types of events
       source.onmessage = (event) => {
         const data = JSON.parse(event.data);
         console.log("Received SSE event:", data);
@@ -93,6 +96,14 @@ const InterviewComponent = () => {
           });
         }
 
+        // Handle final feedback
+        if (data.type === "complete" && data.finalFeedback) {
+          setFinalFeedback(data.finalFeedback);
+          setShowFinalFeedback(true);
+          setStatus("Interview completed");
+          setIsInterviewActive(false);
+        }
+
         if (data.type === "error" && data.error) {
           setError(data.error);
           source.close();
@@ -127,7 +138,6 @@ const InterviewComponent = () => {
     };
   }, []);
 
-  // Rest of your component remains the same...
   const handleUserInput = (e) => {
     setCurrentAnswer(e.target.value);
   };
@@ -149,6 +159,7 @@ const InterviewComponent = () => {
 
   return (
     <div className="interview-container">
+      <Navbar />
       <h2>AI Interview Session</h2>
 
       <div className="status-section">
@@ -175,21 +186,6 @@ const InterviewComponent = () => {
         <div className="question-section">
           <h3>Current Question:</h3>
           <p className="question">{currentQuestion}</p>
-
-          <div className="answer-input">
-            <textarea
-              placeholder="Your answer..."
-              value={currentAnswer}
-              onChange={handleUserInput}
-              disabled={!isInterviewActive}
-            />
-            <button
-              onClick={submitAnswer}
-              disabled={!isInterviewActive || !currentAnswer.trim()}
-            >
-              Submit Answer
-            </button>
-          </div>
         </div>
       )}
 
@@ -197,6 +193,37 @@ const InterviewComponent = () => {
         <div className="feedback-section">
           <h3>Feedback:</h3>
           <p>{feedback}</p>
+        </div>
+      )}
+
+      {/* Add this new section for final feedback */}
+      {showFinalFeedback && finalFeedback && (
+        <div className="final-feedback-section">
+          <h3>Interview Summary</h3>
+          <div className="feedback-category">
+            <h4>Strengths:</h4>
+            <div className="feedback-content">
+              {finalFeedback.strengths.split("\n").map((item, i) => (
+                <p key={i}>{item}</p>
+              ))}
+            </div>
+          </div>
+          <div className="feedback-category">
+            <h4>Areas for Improvement:</h4>
+            <div className="feedback-content">
+              {finalFeedback.weaknesses.split("\n").map((item, i) => (
+                <p key={i}>{item}</p>
+              ))}
+            </div>
+          </div>
+          <div className="feedback-category">
+            <h4>Suggestions:</h4>
+            <div className="feedback-content">
+              {finalFeedback.suggestions.split("\n").map((item, i) => (
+                <p key={i}>{item}</p>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

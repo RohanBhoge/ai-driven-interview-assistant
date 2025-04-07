@@ -111,3 +111,47 @@
   color: #c62828;
   font-style: italic;
 }
+
+/* Add these styles to your existing CSS file */
+.final-feedback-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.final-feedback-section h3 {
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.feedback-category {
+  margin-bottom: 1.5rem;
+}
+
+.feedback-category h4 {
+  color: #3498db;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5rem;
+}
+
+.feedback-content {
+  padding-left: 1rem;
+}
+
+.feedback-content p {
+  margin: 0.5rem 0;
+  line-height: 1.5;
+}
+
+/* Make sure these don't conflict with existing styles */
+.interview-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Rest of your existing CSS remains the same */
