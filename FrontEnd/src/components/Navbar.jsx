@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import "./Navbar.css";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import profileIcon from "../assets/profileIcon.svg";
+import profileIcon from "../assets/profile.png";
 const Navbar = () => {
   const { token, logout } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -19,6 +19,7 @@ const Navbar = () => {
         <Link to={"/"} className="logo">
           Ai-Driven Interview Assistance
         </Link>
+        
         <Link className="navbar-link" to={"/features"}>
           Features
         </Link>

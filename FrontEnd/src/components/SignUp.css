@@ -4,19 +4,12 @@
   align-items: center;
   height: auto;  /* Full viewport height */
   padding: 2rem;
-  background-image: url(https://img.freepik.com/free-photo/cartoon-ai-robot-scene_23-2151675037.jpg?ga=GA1.1.295503421.1742619587&semt=ais_hybrid);
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center;
-    height: 100vh;
-    width: 100vw;
-}
-
+ }
 
 /* Signup Container */
 .signup-container {
-  color:  #54f407;;
-  padding: 5rem;
+  color: white;
+  padding: 2rem;
   border-radius: 1rem;
   max-width: 400px;
   width: 100%;
@@ -28,7 +21,6 @@
   font-weight: bold;
   text-align: center;
   margin-bottom: 1.5rem;
-  color: #0a0a0a;
 }
 
 /* Form Styles */

@@ -7,6 +7,23 @@
   text-align: center;
   padding: 4rem 2rem;
   background-color: #f8f9fa;
+  button {
+    width: 200px;
+    background-color: #007bff;
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: #fff;
+    text-decoration: none;
+    border: none;
+    border-radius: 10px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+button:hover {
+  color: #fff;
+  background-color: #0056b3;
+}
 }
 
 .hero-section h1 {

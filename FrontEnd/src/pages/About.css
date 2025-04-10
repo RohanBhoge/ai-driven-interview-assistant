@@ -46,9 +46,9 @@
 }
 
 .about-description {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   line-height: 1.8;
-  color: #1f1f1f;
+  color: #475569;
   max-width: 800px;
   margin: 2rem auto;
   padding: 0 1rem;
@@ -76,7 +76,7 @@
   font-size: 1.1rem;
   padding: 1.2rem 2rem;
   margin: 1rem 0;
-  background: #dbc1c1;
+  background: white;
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.04);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

@@ -158,98 +158,100 @@ const InterviewComponent = () => {
   };
 
   return (
-    <div className="interview-container">
+    <>
       <Navbar />
-      <h2>AI Interview Session</h2>
+      <div className="interview-container">
+        <h2>AI Interview Session</h2>
 
-      <div className="status-section">
-        <p>
-          <strong>Status:</strong> {status}
-        </p>
-        {progress && (
+        <div className="status-section">
           <p>
-            <strong>Progress:</strong> {progress}
+            <strong>Status:</strong> {status}
           </p>
+          {progress && (
+            <p>
+              <strong>Progress:</strong> {progress}
+            </p>
+          )}
+          {error && <p className="error-message">{error}</p>}
+        </div>
+
+        <div className="controls">
+          {!isInterviewActive ? (
+            <button onClick={startInterview}>Start Interview</button>
+          ) : (
+            <button disabled>Interview in Progress</button>
+          )}
+        </div>
+
+        {currentQuestion && (
+          <div className="question-section">
+            <h3>Current Question:</h3>
+            <p className="question">{currentQuestion}</p>
+          </div>
         )}
-        {error && <p className="error-message">{error}</p>}
-      </div>
 
-      <div className="controls">
-        {!isInterviewActive ? (
-          <button onClick={startInterview}>Start Interview</button>
-        ) : (
-          <button disabled>Interview in Progress</button>
+        {feedback && (
+          <div className="feedback-section">
+            <h3>Feedback:</h3>
+            <p>{feedback}</p>
+          </div>
+        )}
+
+        {/* Add this new section for final feedback */}
+        {showFinalFeedback && finalFeedback && (
+          <div className="final-feedback-section">
+            <h3>Interview Summary</h3>
+            <div className="feedback-category">
+              <h4>Strengths:</h4>
+              <div className="feedback-content">
+                {finalFeedback.strengths.split("\n").map((item, i) => (
+                  <p key={i}>{item}</p>
+                ))}
+              </div>
+            </div>
+            <div className="feedback-category">
+              <h4>Areas for Improvement:</h4>
+              <div className="feedback-content">
+                {finalFeedback.weaknesses.split("\n").map((item, i) => (
+                  <p key={i}>{item}</p>
+                ))}
+              </div>
+            </div>
+            <div className="feedback-category">
+              <h4>Suggestions:</h4>
+              <div className="feedback-content">
+                {finalFeedback.suggestions.split("\n").map((item, i) => (
+                  <p key={i}>{item}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {questions.length > 0 && (
+          <div className="history-section">
+            <h3>Interview History:</h3>
+            {questions.map((item, index) => (
+              <div key={index} className="qa-item">
+                <p className="question-history">
+                  <strong>Q{index + 1}:</strong> {item.question}
+                </p>
+                {item.answer && (
+                  <p className="answer-history">
+                    <strong>A:</strong> {item.answer}
+                  </p>
+                )}
+                {item.feedback && (
+                  <p className="feedback-history">
+                    <strong>Feedback:</strong> {item.feedback}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
-
-      {currentQuestion && (
-        <div className="question-section">
-          <h3>Current Question:</h3>
-          <p className="question">{currentQuestion}</p>
-        </div>
-      )}
-
-      {feedback && (
-        <div className="feedback-section">
-          <h3>Feedback:</h3>
-          <p>{feedback}</p>
-        </div>
-      )}
-
-      {/* Add this new section for final feedback */}
-      {showFinalFeedback && finalFeedback && (
-        <div className="final-feedback-section">
-          <h3>Interview Summary</h3>
-          <div className="feedback-category">
-            <h4>Strengths:</h4>
-            <div className="feedback-content">
-              {finalFeedback.strengths.split("\n").map((item, i) => (
-                <p key={i}>{item}</p>
-              ))}
-            </div>
-          </div>
-          <div className="feedback-category">
-            <h4>Areas for Improvement:</h4>
-            <div className="feedback-content">
-              {finalFeedback.weaknesses.split("\n").map((item, i) => (
-                <p key={i}>{item}</p>
-              ))}
-            </div>
-          </div>
-          <div className="feedback-category">
-            <h4>Suggestions:</h4>
-            <div className="feedback-content">
-              {finalFeedback.suggestions.split("\n").map((item, i) => (
-                <p key={i}>{item}</p>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {questions.length > 0 && (
-        <div className="history-section">
-          <h3>Interview History:</h3>
-          {questions.map((item, index) => (
-            <div key={index} className="qa-item">
-              <p className="question-history">
-                <strong>Q{index + 1}:</strong> {item.question}
-              </p>
-              {item.answer && (
-                <p className="answer-history">
-                  <strong>A:</strong> {item.answer}
-                </p>
-              )}
-              {item.feedback && (
-                <p className="feedback-history">
-                  <strong>Feedback:</strong> {item.feedback}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    </>
   );
 };
 
