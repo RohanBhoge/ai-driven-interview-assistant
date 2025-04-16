@@ -251,7 +251,7 @@ def main():
     resume_text = sys.argv[1]
     difficulty = "medium"
 
-    for i in range(2):  # Ask 5 questions
+    for i in range(1):  # Ask 5 questions
         print(json.dumps({"progress": f"Question {i+1}/5", "questionNumber": i + 1}))
         sys.stdout.flush()
 
