@@ -4,6 +4,7 @@ const { PythonShell } = require("python-shell");
 const path = require("path");
 const Interview = require("../models/interview.js");
 const User = require("../models/User.js");
+const { decode } = require("punycode");
 
 exports.startInterview = async (req, res) => {
   try {
@@ -324,3 +325,23 @@ exports.startInterview = async (req, res) => {
 
 // Submit all answers and generate final feedback
 
+exports.getUserInterviews = async (req, res) => {
+  try {
+    const token = req.headers["x-auth-token"];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log(decoded);
+
+    const userId = decoded.userId;
+
+    const interviews = await Interview.find({ userId })
+      .sort({ date: -1 }) // Sort by most recent first
+      .lean();
+
+    res.json(interviews);
+  } catch (error) {
+    console.error("Error fetching interviews:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

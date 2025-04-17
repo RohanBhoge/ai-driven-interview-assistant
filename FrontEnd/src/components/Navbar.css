@@ -5,6 +5,9 @@
   padding:1rem 2rem;
   background-color: #ffffff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+ position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 .navigation{
   display: flex;

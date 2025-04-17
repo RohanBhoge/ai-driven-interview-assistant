@@ -1,30 +1,189 @@
 .profile-section {
+  width: 90vw;
   padding: 2rem;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  max-width: 400px;
-  margin: 2rem auto;
+  background-color: #f9fafb; /* Light background for full page */
 }
 
 .profile-details {
-  margin-top: 1rem;
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+}
+
+.profile-section h2 {
+  color: #2563eb;
+  font-size: 1.75rem;
+  margin-bottom: 1.5rem;
+  font-weight: bold;
 }
 
 .profile-details p {
-  margin: 0.5rem 0;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  color: #374151;
 }
 
-.download-button {
-  background: none;
-  border: none;
-  color: #007bff;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-  font: inherit;
+.profile-details {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
 }
 
-.download-button:hover {
-  color: #0056b3;
+.interview-history h3 {
+  color: #2563eb;
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  font-weight: bold;
+}
+
+.interview-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.interview-card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.interview-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.interview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.interview-header h4 {
+  color: #111827;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.status-badge.completed {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.in-progress {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.not-started {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.questions-section {
+  margin-top: 1.25rem;
+}
+
+.questions-section h5 {
+  color: #2563eb;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.questions-section ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.questions-section li {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.questions-section li:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.questions-section strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.final-feedback {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.final-feedback h5 {
+  color: #2563eb;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.final-feedback p {
+  margin-bottom: 0.75rem;
+  color: #374151;
+}
+
+.final-feedback strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+/* Empty state styling */
+.interview-history p {
+  color: #6b7280;
+  font-style: italic;
+}
+
+
+.profile-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .profile-section {
+    padding: 0 1rem;
+  }
+  
+  .profile-details,
+  .interview-card {
+    padding: 1.25rem;
+  }
+  
+  .interview-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .status-badge {
+    align-self: flex-start;
+  }
 }
