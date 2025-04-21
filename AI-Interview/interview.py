@@ -23,6 +23,9 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 # Initialize audio system once
 recognizer = sr.Recognizer()
 
+# Global variable to track asked questions
+asked_questions = set()
+
 
 def speak(text):
     """Convert text to speech with proper audio queuing"""
@@ -59,14 +62,16 @@ def listen():
     """Listen to user's voice input and convert it to text"""
     with sr.Microphone() as source:
         recognizer.adjust_for_ambient_noise(source)
-        recognizer.pause_threshold = 1.5
+        recognizer.pause_threshold = 2.0  # Increased pause threshold to 2 seconds
         recognizer.energy_threshold = 4000
+        recognizer.dynamic_energy_threshold = True  # Auto-adjust for ambient noise
 
         try:
             print(json.dumps({"status": "Listening for answer..."}))
             sys.stdout.flush()
 
-            audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+            # Listen with longer timeout and no phrase time limit
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=None)
             print(json.dumps({"status": "Processing answer..."}))
             sys.stdout.flush()
 
@@ -99,28 +104,61 @@ def listen():
 
 def ask_question(resume_text, difficulty="medium"):
     """Generate a question based on resume and difficulty"""
+    global asked_questions
+
     model = genai.GenerativeModel("gemini-2.0-flash")
     prompt = f"""  
     Act as an interviewer. Ask one {difficulty}-level technical question based on this resume:  
     {resume_text}  
     Return ONLY the question (no extra text).  
     """
-    try:
-        print(json.dumps({"status": "Generating question..."}))
-        sys.stdout.flush()
 
-        response = model.generate_content(prompt)
-        question = response.text.strip()
+    max_attempts = 5  # Prevent infinite loops
+    attempt = 0
 
-        print(json.dumps({"question": question, "difficulty": difficulty}))
-        sys.stdout.flush()
-        return question
-    except Exception as e:
-        print(
-            json.dumps({"error": f"Error generating question: {e}", "status": "Error"})
+    while attempt < max_attempts:
+        try:
+            print(json.dumps({"status": "Generating question..."}))
+            sys.stdout.flush()
+
+            response = model.generate_content(prompt)
+            question = response.text.strip()
+
+            # Check if question is unique
+            if question not in asked_questions:
+                asked_questions.add(question)
+                print(json.dumps({"question": question, "difficulty": difficulty}))
+                sys.stdout.flush()
+                return question
+            else:
+                attempt += 1
+                if attempt < max_attempts:
+                    prompt = f"""  
+                    The question "{question}" was already asked. 
+                    Generate a different {difficulty}-level technical question based on this resume:  
+                    {resume_text}  
+                    Return ONLY the question (no extra text).  
+                    """
+
+        except Exception as e:
+            print(
+                json.dumps(
+                    {"error": f"Error generating question: {e}", "status": "Error"}
+                )
+            )
+            sys.stdout.flush()
+            return None
+
+    print(
+        json.dumps(
+            {
+                "error": "Could not generate unique question after multiple attempts",
+                "status": "Error",
+            }
         )
-        sys.stdout.flush()
-        return None
+    )
+    sys.stdout.flush()
+    return None
 
 
 def analyze_answer(question, answer):
