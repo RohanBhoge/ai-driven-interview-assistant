@@ -288,9 +288,13 @@ def main():
 
     resume_text = sys.argv[1]
     difficulty = "medium"
-
-    for i in range(1):  # Ask 5 questions
-        print(json.dumps({"progress": f"Question {i+1}/5", "questionNumber": i + 1}))
+    quations = 5  # Number of questions to ask
+    for i in range(quations):  # Ask 5 questions
+        print(
+            json.dumps(
+                {"progress": f"Question {i+1}/{quations}", "questionNumber": i + 1}
+            )
+        )
         sys.stdout.flush()
 
         question = ask_question(resume_text, difficulty)

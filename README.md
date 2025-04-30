@@ -1,18 +1,131 @@
-# AI-Driven Interview Assistance.
+# AI-Driven Interview Assistance - Mock Interview Simulator
 
-AI-Driven Interview Assistance is an innovative platform designed to simulate real-time interview experiences. The system uses MERN Stack technology to build a full-stack application that integrates an AI assistant for dynamic question generation and analysis. By uploading a resume, the AI asks skill-specific questions, evaluates responses, and adjusts the difficulty based on user performance. The interview session is recorded in video format for self-assessment or peer review. This project also incorporates OpenAI’s API for advanced language processing to create a personalized and interactive interview environment.
+**AI-Driven Interview Assistance** is a full-stack, AI-powered mock interview simulation platform built with the **MERN stack** (MongoDB, Express.js, React.js, Node.js). The AI module is implemented using **Python**, leveraging natural language processing (NLP), machine learning (ML), and the **Gemini API** to dynamically generate questions, analyze responses, and provide actionable feedback. This platform empowers users to prepare for technical interviews through interactive sessions featuring real-time video/audio capture, intelligent question generation based on resume analysis, and personalized feedback.
 
-### backend env file
- **JWT_SECRET**="8646d62c214608ee654fcb41e92ab03b64905371e0b33432df35e88a42fa6f451e6d771cc76db2033141c9b87299da2a147b8c819c79c6e06a308bc92cd1a692a9a81063e340967dc369edd28e4b7d48be02db287fa8e82352e5ce0de4bd7ba730a8746f2d1ef6297444eb7e8c77f789e6017994a061491dd6a2ff5584445784e380a879434579b5ae1fb5abf18c458a7b6decdf39255a7ef302a62a27306775911b882995968ec9ea2e7a8306ec52bc65ce7ee4cdd9e5a564282f47dd4cd02933fb37487f65c7030042ee466554ef37886d7eac5d9ad5f6d997467447d62ca77f30354a2f96bf2eb1a1cdb8a9c483ec4c5386976672cd9083377ee74d77d756"
-**PORT**=5000
+---
 
-**MONGO_URI**="mongodb+srv://bhogerohan12:cnCW8imI45wGwvPo@cluster1.e6z8w.mongodb.net/test?retryWrites=true&w=majority&appName=Cluster1"
+## Table of Contents
 
-### frontend env file 
+- [Preview](#preview)
+- [Features](#features)
+- [Technologies Used](#technologies-used)
+- [Usage](#usage)
+- [Architecture](#architecture)
+- [Deployment](#deployment)
+- [Team Members](#team-members)
+- [Contact](#contact)
+- [Acknowledgments](#acknowledgments)
 
-**VITE_BACKEND_URL**="http://localhost:5000"
+---
 
-hello, this is rohan bhoge
-hi this is Shreyash
+## Preview
 
-This is Wonderfull Team
+![Upload Resume](assets/uploadResume.png)  
+*Upload your resume to begin the personalized interview session.*
+
+![Interview Simulation](assets/AiInterviewPage.png)  
+*Real-time AI interview simulation with dynamic question generation and media recording.*
+
+![Performance analytics](assets/AI-Assistant%20(2).png)  
+*Get detailed performance analytics and improvement suggestions.*
+
+---
+
+## Features
+
+### 🎯 Core Functionalities:
+
+- **Resume Upload & Parsing**: Analyzes user resumes to extract skills and experience using NLP.
+- **AI-Driven Question Generation**: Dynamically generates domain-relevant questions based on the user's resume using the Gemini API.
+- **Adaptive Interview Flow**: Adjusts question difficulty in real-time based on user responses.
+- **Speech Interaction**: Records and transcribes answers using Speech-to-Text APIs.
+- **AI Feedback Engine**: Utilizes the Gemini API to provide constructive feedback on clarity, accuracy, and technical depth of answers.
+
+### 💻 Frontend Highlights:
+
+- Built with **React.js** and styled using **CSS**.
+- **Responsive Design** compatible with desktop and mobile.
+- Utilizes **React Router** for seamless navigation.
+- Integrated **MediaDevices API** and **Web Speech API** for video/audio capture and transcription.
+
+### 🔧 Backend Highlights:
+
+- **Express.js API** to handle resume parsing, question generation, and feedback processing.
+- **MongoDB Atlas** for secure and scalable data storage.
+- Python-based AI module integrated with **Gemini API** for question and feedback logic.
+
+---
+
+## Technologies Used
+
+- **Frontend**: React.js, CSS, React Router, MediaDevices API, Web Speech API
+- **Backend**: Node.js, Express.js
+- **AI Module**: Python (NLP, Machine Learning, Gemini API)
+- **Database**: MongoDB Atlas
+- **Deployment**: Vercel (Frontend), Render (Backend)
+- **Tools**: Git, GitHub, Postman
+
+---
+
+## Usage
+
+1. **Start Interview**: Access the platform and upload your resume (PDF).
+2. **Resume Analysis**: Backend parses resume and identifies relevant skills.
+3. **Interactive Interview**: AI starts asking questions via voice; you respond via video/audio.
+4. **Transcription & Evaluation**: Responses are transcribed and sent to Gemini API for evaluation.
+5. **Receive Feedback**: View insights on your performance and retry for improvement.
+
+---
+
+## Architecture
+
+```plaintext
+Frontend (React.js)
+│
+├── Resume Upload → Backend (Express)
+├── Video/Audio Capture
+├── Fetch AI Questions → Python AI Module (Gemini API)
+└── Feedback Display ← Backend Evaluation
+
+Backend (Node.js + Express)
+│
+├── Resume Parser
+├── AI Question Generator ← Python + Gemini API
+├── Response Evaluator ← Gemini API
+└── MongoDB (Persistent Storage)
+```
+
+<!-- ---
+
+## Deployment
+
+- **Frontend**: [https://ai-interview-sim.vercel.app](https://ai-interview-sim.vercel.app)
+- **Backend**: Deployed on Render (Private Instance)
+
+--- -->
+
+## Team Members
+
+This project was collaboratively developed as a final year engineering project by the following team members:
+
+- 🎓 **Dnayaneshvari Wakarekar** – Team Leader (Project Coordination & Management)
+- 👩‍💻 **Nikita Jadhav** – Frontend & Integration
+- 👨‍💻 **Rohan Bhoge** – Python AI Module & AI API Integration
+- 👨‍💻 **Shreyash Shedage** – Backend & Integration
+
+---
+
+## Contact
+
+- **Email**: [bhogerohan12@gmail.com](mailto:bhogerohan12@gmail.com)
+- **GitHub**: [https://github.com/RohanBhoge](https://github.com/RohanBhoge)
+- **LinkedIn**: [https://www.linkedin.com/in/rohanbhoge](https://www.linkedin.com/in/rohanbhoge)
+
+---
+
+## Acknowledgments
+
+- Thanks to **Gemini API**, **OpenAI**, **Web APIs**, and the **open-source developer community** for their invaluable contributions.
+- Inspired by real-world tech interview platforms and modern advancements in AI.
+- Special thanks to our project guide Prof. *Snehal Malpani* at D.Y. Patil College of Engineering, Akurdi, Pune for their support and guidance.
+

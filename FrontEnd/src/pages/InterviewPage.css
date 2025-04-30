@@ -184,7 +184,8 @@
 .webcam-container {
   width: 320px;
   height: 240px;
-  position: relative;
+  position: sticky;
+  top: 100px;
   border-radius: 8px;
   overflow: hidden;
   background-color: #000;

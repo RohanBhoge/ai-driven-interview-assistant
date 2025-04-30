@@ -20,6 +20,7 @@ const InterviewComponent = () => {
   const [interviewId, setInterviewId] = useState(null);
   const [finalFeedback, setFinalFeedback] = useState(null);
   const [showFinalFeedback, setShowFinalFeedback] = useState(false);
+  const [quationNumber, setQuationNumber] = useState(false);
 
   // Webcam recording state
   const videoRef = useRef(null);
@@ -192,6 +193,7 @@ const InterviewComponent = () => {
 
         if (data.type === "question" && data.question) {
           setCurrentQuestion(data.question);
+          setQuationNumber(data.questionNumber);
           setQuestions((prevQuestions) => [
             ...prevQuestions,
             {
@@ -314,7 +316,7 @@ const InterviewComponent = () => {
               </p>
               {progress && (
                 <p>
-                  <strong>Progress:</strong> {progress}
+                  <strong>Progress:</strong>Quation {quationNumber? quationNumber:0}/5
                 </p>
               )}
               {error && <p className="error-message">{error}</p>}
@@ -332,15 +334,6 @@ const InterviewComponent = () => {
               <div className="question-section">
                 <h3>Current Question:</h3>
                 <p className="question">{currentQuestion}</p>
-                <div className="answer-input">
-                  <textarea
-                    value={currentAnswer}
-                    onChange={handleUserInput}
-                    placeholder="Type your answer here..."
-                    rows={4}
-                  />
-                  <button onClick={submitAnswer}>Submit Answer</button>
-                </div>
               </div>
             )}
 

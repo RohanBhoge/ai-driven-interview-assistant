@@ -331,7 +331,6 @@ exports.getUserInterviews = async (req, res) => {
     if (!token) return res.status(401).json({ error: "No token provided" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log(decoded);
 
     const userId = decoded.userId;
 
