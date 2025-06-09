@@ -22,8 +22,6 @@ const SignUp = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-
     // Validate form data
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
@@ -43,8 +41,6 @@ const SignUp = () => {
 
       // Handle successful registration
       console.log("Registration successful:", response.data);
-      login(response.data.token); // Store the token
-      navigate("/uploadpdf"); // Redirect to the upload page
     } catch (error) {
       // Handle errors
       setError(error.response?.data?.message || "Registration failed");

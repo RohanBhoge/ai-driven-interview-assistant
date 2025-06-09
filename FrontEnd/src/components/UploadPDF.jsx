@@ -1,14 +1,17 @@
 import { useState } from "react";
 import axios from "axios";
-import "./UploadPDF.css"; // Ensure you have this CSS file
+import "./UploadPDF.css";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "./Navbar";
 import { useInterview } from "../context/InterviewContext";
+import { toast } from "react-toastify"; // Correct import for toast notifications
+import "react-toastify/dist/ReactToastify.css"; // Import toast styles
 
 const UploadPDF = () => {
-  const { text, setText } = useInterview();
+  const { setText } = useInterview();
   const [file, setFile] = useState(null);
   const { token } = useAuth();
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -17,10 +20,11 @@ const UploadPDF = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
-      alert("Please select a PDF file.");
+      toast.warning("Please select a PDF file.");
       return;
     }
 
+    setIsUploading(true);
     const formData = new FormData();
     formData.append("pdf", file);
 
@@ -31,17 +35,19 @@ const UploadPDF = () => {
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            "x-auth-token": token, // Include the JWT token
+            "x-auth-token": token,
           },
         }
       );
 
       localStorage.setItem("text", response.data.text);
-      setText(localStorage.getItem("text"));
-      alert("Resume text extracted successfully.");
+      setText(response.data.text);
+      toast.success("Resume uploaded successfully!");
     } catch (error) {
       console.error("Error uploading file:", error);
-      alert("Failed to upload and extract text.");
+      toast.error("Failed to upload PDF. Please try again.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -49,21 +55,18 @@ const UploadPDF = () => {
     <>
       <Navbar />
       <div className="upload-container">
-        <h2>Upload PDF to Extract Text</h2>
+        <h2>Upload Your Resume (PDF)</h2>
         <form onSubmit={handleSubmit}>
           <input
             type="file"
             accept="application/pdf"
             onChange={handleFileChange}
+            className="file-input"
           />
-          <button type="submit">Upload and Extract Text</button>
+          <button type="submit" disabled={isUploading}>
+            {isUploading ? "Uploading..." : "Upload Resume"}
+          </button>
         </form>
-        {text && (
-          <div className="text-output">
-            <h3>Extracted Text:</h3>
-            <pre>{text}</pre>
-          </div>
-        )}
       </div>
     </>
   );

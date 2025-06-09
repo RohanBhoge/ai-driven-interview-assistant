@@ -9,6 +9,7 @@ import Features from "./pages/Feature";
 import ProfilePage from "./pages/ProfilePage";
 import InterviewPage from "./pages/InterviewPage";
 import { InterviewProvider } from "./context/InterviewContext";
+import { ToastContainer } from "react-toastify";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/interview" element={<InterviewPage />} />
           </Routes>
+          <ToastContainer />
         </InterviewProvider>
       </AuthProvider>
     </>

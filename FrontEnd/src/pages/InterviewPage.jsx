@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import axios from "axios";
 import "./InterviewPage.css";
 import { useInterview } from "../context/InterviewContext";
 import { EventSourcePolyfill } from "event-source-polyfill";
 import { useAuth } from "../context/AuthContext.jsx";
 import Navbar from "../components/Navbar.jsx";
+import { convert } from "webm-to-mp4";
 
 const InterviewComponent = () => {
   const { userId, token } = useAuth();
@@ -29,6 +29,7 @@ const InterviewComponent = () => {
   const [isRecording, setIsRecording] = useState(false);
 
   const eventSourceRef = useRef(null);
+  const [stopRequested, setStopRequested] = useState(false);
 
   // Initialize webcam
   const startWebcam = async () => {
@@ -63,12 +64,16 @@ const InterviewComponent = () => {
 
     try {
       const options = {
-        mimeType: 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"',
-        videoBitsPerSecond: 2500000, // 2.5 Mbps for good quality
+        mimeType: 'video/webm; codecs="vp9,opus"',
+        videoBitsPerSecond: 2500000,
+        audioBitsPerSecond: 128000,
       };
 
       mediaRecorderRef.current = new MediaRecorder(stream, options);
       recordedChunksRef.current = [];
+
+      // Keyframe every 1 second for good seeking
+      mediaRecorderRef.current.start(1000);
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -76,7 +81,6 @@ const InterviewComponent = () => {
         }
       };
 
-      mediaRecorderRef.current.start(1000); // 1 second timeslices for metadata
       setIsRecording(true);
       return true;
     } catch (err) {
@@ -86,7 +90,7 @@ const InterviewComponent = () => {
     }
   };
 
-  // Stop recording and return the blob
+  // Updated stopRecording function
   const stopRecording = () => {
     return new Promise((resolve) => {
       if (
@@ -95,11 +99,10 @@ const InterviewComponent = () => {
       ) {
         mediaRecorderRef.current.onstop = () => {
           const blob = new Blob(recordedChunksRef.current, {
-            type: "video/mp4",
+            type: "video/webm",
           });
           resolve(blob);
 
-          // Clean up media streams
           if (videoRef.current?.srcObject) {
             videoRef.current.srcObject
               .getTracks()
@@ -114,22 +117,26 @@ const InterviewComponent = () => {
     });
   };
 
-  // Download the recorded video
+  // Simplified downloadVideo function
   const downloadVideo = (blob) => {
     if (!blob) return;
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `interview-recording-${new Date().toISOString()}.mp4`;
-    document.body.appendChild(a);
-    a.click();
+    try {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `interview-recording-${new Date().toISOString()}.webm`;
+      document.body.appendChild(a);
+      a.click();
 
-    // Clean up
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      console.error("Error downloading video:", error);
+      setError("Failed to download recording");
+    }
   };
 
   // Handle interview completion
@@ -142,6 +149,7 @@ const InterviewComponent = () => {
 
   const startInterview = async () => {
     try {
+      setStopRequested(false);
       setStatus("Starting interview...");
       setIsInterviewActive(true);
       setError(null);
@@ -286,6 +294,49 @@ const InterviewComponent = () => {
     setCurrentAnswer("");
   };
 
+  const stopInterview = async () => {
+    try {
+      setStopRequested(true);
+      setStatus("Stopping interview...");
+
+      // Close the SSE connection if it exists
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+
+      // Send stop request to backend
+      const response = await fetch("/api/interview/stop", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-auth-token": token,
+        },
+        body: JSON.stringify({
+          interviewId,
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to stop interview");
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setStatus("Interview stopped successfully");
+        setIsInterviewActive(false);
+        handleInterviewComplete();
+      } else {
+        throw new Error(result.error || "Failed to stop interview");
+      }
+    } catch (error) {
+      console.error("Error stopping interview:", error);
+      setError(error.message || "Failed to stop interview");
+      setStopRequested(false);
+    }
+  };
+
   return (
     <>
       <Navbar />
@@ -316,7 +367,8 @@ const InterviewComponent = () => {
               </p>
               {progress && (
                 <p>
-                  <strong>Progress:</strong>Quation {quationNumber? quationNumber:0}/5
+                  <strong>Progress:</strong>Quation{" "}
+                  {quationNumber ? quationNumber : 0}/5
                 </p>
               )}
               {error && <p className="error-message">{error}</p>}
@@ -326,7 +378,9 @@ const InterviewComponent = () => {
               {!isInterviewActive ? (
                 <button onClick={startInterview}>Start Interview</button>
               ) : (
-                <button disabled>Interview in Progress</button>
+                <div className="interview-controls">
+                  <button onClick={stopInterview}>Stop Interview</button>
+                </div>
               )}
             </div>
 

@@ -8,6 +8,15 @@ from dotenv import load_dotenv
 import speech_recognition as sr
 from gtts import gTTS
 import google.generativeai as genai
+import signal
+
+
+def handle_interrupt(signum, frame):
+    print(json.dumps({"status": "Interview stopped by user", "complete": True}))
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, handle_interrupt)
 
 # Suppress pygame output
 with contextlib.redirect_stdout(None):
@@ -265,64 +274,84 @@ def generate_final_feedback(questions_and_answers):
 
 
 def main():
-    # Check if we're in final feedback mode
-    if len(sys.argv) > 2 and sys.argv[1] == "--final-feedback":
-        try:
-            qa_pairs = json.loads(sys.argv[2])
-            feedback = generate_final_feedback(qa_pairs)
-            if feedback:
-                print(feedback)
-            sys.exit(0)
-        except Exception as e:
-            print(json.dumps({"error": str(e)}))
+    try:
+        # Check if we're in final feedback mode
+        if len(sys.argv) > 2 and sys.argv[1] == "--final-feedback":
+            try:
+                qa_pairs = json.loads(sys.argv[2])
+                feedback = generate_final_feedback(qa_pairs)
+                if feedback:
+                    print(feedback)
+                sys.exit(0)
+            except Exception as e:
+                print(json.dumps({"error": str(e)}))
+                sys.exit(1)
+
+        # Original interview flow
+        print(json.dumps({"status": "Starting interview process"}))
+        sys.stdout.flush()
+
+        if len(sys.argv) < 2:
+            print(json.dumps({"error": "Resume text is required"}))
+            sys.stdout.flush()
             sys.exit(1)
 
-    # Original interview flow
-    print(json.dumps({"status": "Starting interview process"}))
-    sys.stdout.flush()
+        resume_text = sys.argv[1]
 
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "Resume text is required"}))
-        sys.stdout.flush()
-        sys.exit(1)
+        #     resume_text = """ Relevant Coursework: Front-end dev, Back-End Development, Html, Css, JavaScript, ReactJs, API,
+        # Debugging, React Router, Unit testing, RESTful APIs, Data Structures and Algorithms, NodeJS
+        # Programming Languages: Advance JavaScript, Basic Python, Basic C++, SQL
+        # Tools:Visual Studio, Jupyter Notebook, Git and GitHub, Postman, MongoDB Atlas
+        # Frameworks: ReactJS, Express.js, Mongoose
+        # Key Skills: Front-End Development, Back-End Development, Database Management, Responsive Design,
+        # Version Control, Problem Solving, Critical Thinking"""
 
-    resume_text = sys.argv[1]
-    difficulty = "medium"
-    quations = 5  # Number of questions to ask
-    for i in range(quations):  # Ask 5 questions
-        print(
-            json.dumps(
-                {"progress": f"Question {i+1}/{quations}", "questionNumber": i + 1}
+        # Get resume text from command line argument
+        difficulty = "medium"
+        quations = 5  # Number of questions to ask
+        for i in range(quations):  # Ask 5 questions
+            if getattr(sys, "stop_requested", False):
+                print(json.dumps({"status": "Stopping interview", "complete": True}))
+                break
+            print(
+                json.dumps(
+                    {"progress": f"Question {i+1}/{quations}", "questionNumber": i + 1}
+                )
             )
-        )
+            sys.stdout.flush()
+
+            question = ask_question(resume_text, difficulty)
+            if not question:
+                continue
+
+            print(json.dumps({"question": question, "difficulty": difficulty}))
+            sys.stdout.flush()
+
+            speak(question)
+            time.sleep(1)
+
+            answer = listen()
+            if not answer:
+                answer = "No answer provided"
+
+            print(json.dumps({"answer": answer}))
+            sys.stdout.flush()
+
+            feedback, next_difficulty = analyze_answer(question, answer)
+            print(json.dumps({"feedback": feedback}))
+            sys.stdout.flush()
+
+            difficulty = next_difficulty
+
+        print(json.dumps({"status": "Interview completed", "complete": True}))
         sys.stdout.flush()
-
-        question = ask_question(resume_text, difficulty)
-        if not question:
-            continue
-
-        print(json.dumps({"question": question, "difficulty": difficulty}))
-        sys.stdout.flush()
-
-        speak(question)
-        time.sleep(1)
-
-        answer = listen()
-        if not answer:
-            answer = "No answer provided"
-
-        print(json.dumps({"answer": answer}))
-        sys.stdout.flush()
-
-        feedback, next_difficulty = analyze_answer(question, answer)
-        print(json.dumps({"feedback": feedback}))
-        sys.stdout.flush()
-
-        difficulty = next_difficulty
-
-    print(json.dumps({"status": "Interview completed", "complete": True}))
-    sys.stdout.flush()
-    sys.exit(0)
+        sys.exit(0)
+    except KeyboardInterrupt:
+        print(json.dumps({"status": "Interview stopped", "complete": True}))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"error": str(e), "complete": True}))
+        sys.exit(1)
 
 
 if __name__ == "__main__":
