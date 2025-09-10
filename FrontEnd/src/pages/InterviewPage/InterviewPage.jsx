@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import "./InterviewPage.css";
-import { useInterview } from "../context/InterviewContext";
+import { useInterview } from "../../context/InterviewContext";
 import { EventSourcePolyfill } from "event-source-polyfill";
-import { useAuth } from "../context/AuthContext.jsx";
-import Navbar from "../components/Navbar.jsx";
-import { convert } from "webm-to-mp4";
+import { useAuth } from "../../context/AuthContext.jsx";
+import Navbar from "../../components/NavBar/Navbar.jsx";
 
 const InterviewComponent = () => {
   const { userId, token } = useAuth();

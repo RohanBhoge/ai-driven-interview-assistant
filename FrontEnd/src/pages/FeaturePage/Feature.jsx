@@ -1,5 +1,5 @@
-import FeatureCard from "../components/FeatureCard";
-import Navbar from "../components/Navbar";
+import FeatureCard from "../../components/FeatureCard/FeatureCard";
+import Navbar from "../../components/NavBar/Navbar.jsx";
 import "./Feature.css";
 
 const Features = () => {

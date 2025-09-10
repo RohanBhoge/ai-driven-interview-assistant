@@ -1,9 +1,9 @@
 import { useState } from "react";
 import axios from "axios";
 import "./UploadPDF.css";
-import { useAuth } from "../context/AuthContext";
-import Navbar from "./Navbar";
-import { useInterview } from "../context/InterviewContext";
+import { useAuth} from "../../context/AuthContext.jsx"
+import Navbar from "../NavBar/Navbar";
+import { useInterview } from "../../context/InterviewContext";
 import { toast } from "react-toastify"; // Correct import for toast notifications
 import "react-toastify/dist/ReactToastify.css"; // Import toast styles
 

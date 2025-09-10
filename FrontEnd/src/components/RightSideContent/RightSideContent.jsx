@@ -1,4 +1,4 @@
-import InterviewImage from "../assets/interview-image.jpg";
+import InterviewImage from "../../assets/interview-image.jpg";
 import "./RightSideContent.css";
 const RightSideContent = () => {
   return (

@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./SignUp.css"; // Import the CSS file
-import { useAuth } from "../context/AuthContext";
-import Navbar from "./Navbar";
+import Navbar from "../NavBar/Navbar";
+import { Link } from "react-router-dom";
 
 const SignUp = () => {
   const [formData, setFormData] = useState({
@@ -13,15 +12,13 @@ const SignUp = () => {
     confirmPassword: "",
   });
   const [error, setError] = useState("");
-  const { login } = useAuth();
-  const navigate = useNavigate();
 
   const handleChange = (e) => {
     const { id, value } = e.target;
     setFormData({ ...formData, [id]: value });
   };
-
-  const handleSubmit = async (e) => {
+  
+  const handleSubmit = async () => {
     // Validate form data
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");

@@ -1,15 +1,15 @@
 import { Route, Routes } from "react-router-dom";
-import Home from "./pages/Home";
-import LoginPage from "./pages/LoginPage";
-import SignUp from "./components/SignUp";
-import UploadPDF from "./components/UploadPDF";
+import LoginPage from "./pages/AuthPage/LoginPage";
+import SignUp from "./components/Auth/SignUp";
+import UploadPDF from "./components/UploadPDF/UploadPDF.jsx";
 import { AuthProvider } from "./context/AuthContext";
-import About from "./pages/About";
-import Features from "./pages/Feature";
-import ProfilePage from "./pages/ProfilePage";
-import InterviewPage from "./pages/InterviewPage";
+import ProfilePage from "./pages/ProfilePage/ProfilePage.jsx";
+import InterviewPage from "./pages/InterviewPage/InterviewPage.jsx";
 import { InterviewProvider } from "./context/InterviewContext";
 import { ToastContainer } from "react-toastify";
+import About from "./pages/AboutPage/About";
+import Home from "./pages/HomePage/Home";
+import Features from "./pages/FeaturePage/Feature";
 
 function App() {
   return (

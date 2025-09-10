@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Login.css"; // Import the CSS file
-import { useAuth } from "../context/AuthContext";
-import Navbar from "./Navbar";
+import { useAuth } from "../../context/AuthContext";
+import Navbar from "../NavBar/Navbar";
 
 const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+  
   const [error, setError] = useState("");
+  
   const { login } = useAuth(); // Use the login function from the context
   const navigate = useNavigate();
 
@@ -31,9 +33,7 @@ const Login = () => {
         }
       );
 
-      // Handle successful login
-      console.log("Login successful:", response.data.userId);
-      login(response.data.token, response.data.userId); // Store the token and userId
+      await login(response.data.token, response.data.userId); // Store the token and userId
       navigate("/uploadpdf"); // Redirect to the upload page
     } catch (error) {
       // Handle errors
