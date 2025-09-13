@@ -1,0 +1,105 @@
+.auth-page-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 80px); /* Adjust based on Navbar height */
+            background-color: #f4f7f6;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+          }
+
+          .auth-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+          }
+
+          .auth-container h1 {
+            margin-bottom: 24px;
+            color: #333;
+            font-size: 28px;
+          }
+
+          .error-message {
+            color: #d32f2f;
+            background-color: #ffebee;
+            border: 1px solid #d32f2f;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+          }
+
+          .auth-form div {
+            margin-bottom: 20px;
+            text-align: left;
+          }
+
+          .auth-form label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+          }
+
+          .auth-form input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+          }
+
+          .auth-form input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.2);
+          }
+
+          .auth-button {
+            width: 100%;
+            padding: 14px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+          }
+
+          .auth-button:hover:not(:disabled) {
+            background-color: #0056b3;
+          }
+
+          .auth-button:active:not(:disabled) {
+            transform: translateY(1px);
+          }
+
+          .auth-button:disabled {
+            background-color: #a0c3e6;
+            cursor: not-allowed;
+          }
+
+          .switch-mode {
+            margin-top: 24px;
+            color: #555;
+          }
+
+          .switch-mode span {
+            color: #007bff;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 5px;
+          }
+
+          .switch-mode span:hover {
+            text-decoration: underline;
+          }
+        

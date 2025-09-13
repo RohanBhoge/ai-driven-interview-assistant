@@ -1,25 +1,87 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useReducer, useCallback } from "react";
 import "./InterviewPage.css";
 import { useInterview } from "../../context/InterviewContext";
 import { EventSourcePolyfill } from "event-source-polyfill";
 import { useAuth } from "../../context/AuthContext.jsx";
 import Navbar from "../../components/NavBar/Navbar.jsx";
+import WebcamRecorder from "./WebcamRecorder";
+import InterviewChat from "./InterviewChat";
 
-const InterviewComponent = () => {
+const initialState = {
+  status: "Ready to start",
+  questions: [],
+  currentQuestion: null,
+  currentAnswer: "",
+  feedback: "",
+  isInterviewActive: false,
+  error: null,
+  progress: "",
+  interviewId: null,
+  finalFeedback: null,
+  showFinalFeedback: false,
+  quationNumber: false,
+};
+
+function interviewReducer(state, action) {
+  switch (action.type) {
+    case "SET_STATUS":
+      return { ...state, status: action.payload };
+    case "SET_QUESTIONS":
+      return { ...state, questions: action.payload };
+    case "ADD_QUESTION":
+      return { ...state, questions: [...state.questions, action.payload] };
+    case "UPDATE_LAST_QUESTION":
+      return {
+        ...state,
+        questions: state.questions.map((q, i, arr) =>
+          i === arr.length - 1 ? { ...q, ...action.payload } : q
+        ),
+      };
+    case "SET_CURRENT_QUESTION":
+      return { ...state, currentQuestion: action.payload };
+    case "SET_CURRENT_ANSWER":
+      return { ...state, currentAnswer: action.payload };
+    case "SET_FEEDBACK":
+      return { ...state, feedback: action.payload };
+    case "SET_IS_INTERVIEW_ACTIVE":
+      return { ...state, isInterviewActive: action.payload };
+    case "SET_ERROR":
+      return { ...state, error: action.payload };
+    case "SET_PROGRESS":
+      return { ...state, progress: action.payload };
+    case "SET_INTERVIEW_ID":
+      return { ...state, interviewId: action.payload };
+    case "SET_FINAL_FEEDBACK":
+      return { ...state, finalFeedback: action.payload };
+    case "SET_SHOW_FINAL_FEEDBACK":
+      return { ...state, showFinalFeedback: action.payload };
+    case "SET_QUATION_NUMBER":
+      return { ...state, quationNumber: action.payload };
+    case "RESET":
+      return initialState;
+    default:
+      return state;
+  }
+}
+
+function InterviewComponent() {
   const { userId, token } = useAuth();
   const { text } = useInterview();
-  const [status, setStatus] = useState("Ready to start");
-  const [questions, setQuestions] = useState([]);
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [currentAnswer, setCurrentAnswer] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [isInterviewActive, setIsInterviewActive] = useState(false);
-  const [error, setError] = useState(null);
-  const [progress, setProgress] = useState("");
-  const [interviewId, setInterviewId] = useState(null);
-  const [finalFeedback, setFinalFeedback] = useState(null);
-  const [showFinalFeedback, setShowFinalFeedback] = useState(false);
-  const [quationNumber, setQuationNumber] = useState(false);
+  const [state, dispatch] = useReducer(interviewReducer, initialState);
+  const {
+    status,
+    questions,
+    currentQuestion,
+    currentAnswer,
+    feedback,
+    isInterviewActive,
+    error,
+    progress,
+    interviewId,
+    finalFeedback,
+    showFinalFeedback,
+    quationNumber,
+  } = state;
 
   // Webcam recording state
   const videoRef = useRef(null);
@@ -28,9 +90,8 @@ const InterviewComponent = () => {
   const [isRecording, setIsRecording] = useState(false);
 
   const eventSourceRef = useRef(null);
-  const [stopRequested, setStopRequested] = useState(false);
 
-  // Initialize webcam
+  // Start webcam
   const startWebcam = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -41,55 +102,43 @@ const InterviewComponent = () => {
         },
         audio: true,
       });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-
+      if (videoRef.current) videoRef.current.srcObject = stream;
       return stream;
     } catch (err) {
-      console.error("Error accessing camera:", err);
-      setError(
-        "Could not access camera. Interview will continue without recording."
-      );
+      dispatch({
+        type: "SET_ERROR",
+        payload:
+          "Could not access camera. Interview will continue without recording.",
+      });
       return null;
     }
   };
 
-  // Start recording with proper MP4 format
+  // Start recording
   const startRecording = async () => {
     const stream = await startWebcam();
     if (!stream) return false;
-
     try {
       const options = {
         mimeType: 'video/webm; codecs="vp9,opus"',
         videoBitsPerSecond: 2500000,
         audioBitsPerSecond: 128000,
       };
-
       mediaRecorderRef.current = new MediaRecorder(stream, options);
       recordedChunksRef.current = [];
-
-      // Keyframe every 1 second for good seeking
       mediaRecorderRef.current.start(1000);
-
       mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          recordedChunksRef.current.push(event.data);
-        }
+        if (event.data.size > 0) recordedChunksRef.current.push(event.data);
       };
-
       setIsRecording(true);
       return true;
     } catch (err) {
-      console.error("Error starting recording:", err);
       stream.getTracks().forEach((track) => track.stop());
       return false;
     }
   };
 
-  // Updated stopRecording function
+  // Stop recording
   const stopRecording = () => {
     return new Promise((resolve) => {
       if (
@@ -101,7 +150,6 @@ const InterviewComponent = () => {
             type: "video/webm",
           });
           resolve(blob);
-
           if (videoRef.current?.srcObject) {
             videoRef.current.srcObject
               .getTracks()
@@ -116,10 +164,9 @@ const InterviewComponent = () => {
     });
   };
 
-  // Simplified downloadVideo function
+  // Download video
   const downloadVideo = (blob) => {
     if (!blob) return;
-
     try {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -127,45 +174,37 @@ const InterviewComponent = () => {
       a.download = `interview-recording-${new Date().toISOString()}.webm`;
       document.body.appendChild(a);
       a.click();
-
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 100);
     } catch (error) {
-      console.error("Error downloading video:", error);
-      setError("Failed to download recording");
+      dispatch({ type: "SET_ERROR", payload: "Failed to download recording" });
     }
   };
 
-  // Handle interview completion
+  // Interview complete
   const handleInterviewComplete = async () => {
     const videoBlob = await stopRecording();
-    if (videoBlob) {
-      downloadVideo(videoBlob);
-    }
+    if (videoBlob) downloadVideo(videoBlob);
   };
 
-  const startInterview = async () => {
+  // Start interview
+  const startInterview = useCallback(async () => {
     try {
-      setStopRequested(false);
-      setStatus("Starting interview...");
-      setIsInterviewActive(true);
-      setError(null);
-      setQuestions([]);
-      setFinalFeedback(null);
-      setShowFinalFeedback(false);
-
-      // Start recording
+      dispatch({ type: "SET_STATUS", payload: "Starting interview..." });
+      dispatch({ type: "SET_IS_INTERVIEW_ACTIVE", payload: true });
+      dispatch({ type: "SET_ERROR", payload: null });
+      dispatch({ type: "SET_QUESTIONS", payload: [] });
+      dispatch({ type: "SET_FINAL_FEEDBACK", payload: null });
+      dispatch({ type: "SET_SHOW_FINAL_FEEDBACK", payload: false });
       const recordingStarted = await startRecording();
-      if (!recordingStarted) {
-        setError("Video recording failed - continuing without recording");
-      }
-
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-
+      if (!recordingStarted)
+        dispatch({
+          type: "SET_ERROR",
+          payload: "Video recording failed - continuing without recording",
+        });
+      if (eventSourceRef.current) eventSourceRef.current.close();
       const source = new EventSourcePolyfill(
         `/api/interview/start?userId=${userId}&resumeText=${encodeURIComponent(
           text
@@ -179,160 +218,125 @@ const InterviewComponent = () => {
           heartbeatTimeout: 60000,
         }
       );
-
       eventSourceRef.current = source;
-
       source.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        console.log("Received SSE event:", data);
-
-        if (data.interviewId) {
-          setInterviewId(data.interviewId);
-        }
-
-        if (data.status) {
-          setStatus(data.status);
-        }
-
-        if (data.progress) {
-          setProgress(data.progress);
-        }
-
+        if (data.interviewId)
+          dispatch({ type: "SET_INTERVIEW_ID", payload: data.interviewId });
+        if (data.status) dispatch({ type: "SET_STATUS", payload: data.status });
+        if (data.progress)
+          dispatch({ type: "SET_PROGRESS", payload: data.progress });
         if (data.type === "question" && data.question) {
-          setCurrentQuestion(data.question);
-          setQuationNumber(data.questionNumber);
-          setQuestions((prevQuestions) => [
-            ...prevQuestions,
-            {
+          dispatch({ type: "SET_CURRENT_QUESTION", payload: data.question });
+          dispatch({
+            type: "SET_QUATION_NUMBER",
+            payload: data.questionNumber,
+          });
+          dispatch({
+            type: "ADD_QUESTION",
+            payload: {
               question: data.question,
               difficulty: data.difficulty || "medium",
               answer: "",
               feedback: "",
             },
-          ]);
-        }
-
-        if (data.type === "feedback" && data.feedback) {
-          setFeedback(data.feedback);
-          setQuestions((prevQuestions) => {
-            const updated = [...prevQuestions];
-            if (updated.length > 0) {
-              const lastIndex = updated.length - 1;
-              updated[lastIndex] = {
-                ...updated[lastIndex],
-                feedback: data.feedback,
-              };
-            }
-            return updated;
           });
         }
-
+        if (data.type === "feedback" && data.feedback) {
+          dispatch({ type: "SET_FEEDBACK", payload: data.feedback });
+          dispatch({
+            type: "UPDATE_LAST_QUESTION",
+            payload: { feedback: data.feedback },
+          });
+        }
         if (data.type === "complete" && data.finalFeedback) {
-          setFinalFeedback(data.finalFeedback);
-          setShowFinalFeedback(true);
-          setStatus("Interview completed");
-          setIsInterviewActive(false);
+          dispatch({ type: "SET_FINAL_FEEDBACK", payload: data.finalFeedback });
+          dispatch({ type: "SET_SHOW_FINAL_FEEDBACK", payload: true });
+          dispatch({ type: "SET_STATUS", payload: "Interview completed" });
+          dispatch({ type: "SET_IS_INTERVIEW_ACTIVE", payload: false });
           handleInterviewComplete();
         }
-
         if (data.type === "error" && data.error) {
-          setError(data.error);
+          dispatch({ type: "SET_ERROR", payload: data.error });
           source.close();
           handleInterviewComplete();
         }
-
         if (data.type === "complete" || data.complete) {
-          setStatus("Interview completed");
-          setIsInterviewActive(false);
+          dispatch({ type: "SET_STATUS", payload: "Interview completed" });
+          dispatch({ type: "SET_IS_INTERVIEW_ACTIVE", payload: false });
           handleInterviewComplete();
           source.close();
         }
       };
-
       source.onerror = (event) => {
-        console.error("SSE error:", event);
-        setError("Connection error. Please try again.");
-        setIsInterviewActive(false);
+        dispatch({
+          type: "SET_ERROR",
+          payload: "Connection error. Please try again.",
+        });
+        dispatch({ type: "SET_IS_INTERVIEW_ACTIVE", payload: false });
         handleInterviewComplete();
         source.close();
       };
     } catch (error) {
-      console.error("Error starting interview:", error);
-      setError(error.message || "Failed to start interview");
-      setIsInterviewActive(false);
+      dispatch({
+        type: "SET_ERROR",
+        payload: error.message || "Failed to start interview",
+      });
+      dispatch({ type: "SET_IS_INTERVIEW_ACTIVE", payload: false });
       handleInterviewComplete();
     }
-  };
+  }, [text, token, userId]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
+      if (eventSourceRef.current) eventSourceRef.current.close();
       stopRecording();
     };
   }, []);
 
-  const handleUserInput = (e) => {
-    setCurrentAnswer(e.target.value);
-  };
+  const handleUserInput = useCallback((e) => {
+    dispatch({ type: "SET_CURRENT_ANSWER", payload: e.target.value });
+  }, []);
 
-  const submitAnswer = () => {
-    setQuestions((prevQuestions) => {
-      const updated = [...prevQuestions];
-      if (updated.length > 0) {
-        const lastIndex = updated.length - 1;
-        updated[lastIndex] = {
-          ...updated[lastIndex],
-          answer: currentAnswer,
-        };
-      }
-      return updated;
+  const submitAnswer = useCallback(() => {
+    dispatch({
+      type: "UPDATE_LAST_QUESTION",
+      payload: { answer: currentAnswer },
     });
-    setCurrentAnswer("");
-  };
+    dispatch({ type: "SET_CURRENT_ANSWER", payload: "" });
+  }, [currentAnswer]);
 
   const stopInterview = async () => {
     try {
-      setStopRequested(true);
-      setStatus("Stopping interview...");
-
-      // Close the SSE connection if it exists
+      dispatch({ type: "SET_STATUS", payload: "Stopping interview..." });
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-
-      // Send stop request to backend
       const response = await fetch("/api/interview/stop", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-auth-token": token,
-        },
-        body: JSON.stringify({
-          interviewId,
-          userId,
-        }),
+        headers: { "Content-Type": "application/json", "x-auth-token": token },
+        body: JSON.stringify({ interviewId, userId }),
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to stop interview");
-      }
-
+      if (!response.ok) throw new Error("Failed to stop interview");
       const result = await response.json();
       if (result.success) {
-        setStatus("Interview stopped successfully");
-        setIsInterviewActive(false);
+        dispatch({
+          type: "SET_STATUS",
+          payload: "Interview stopped successfully",
+        });
+        dispatch({ type: "SET_IS_INTERVIEW_ACTIVE", payload: false });
         handleInterviewComplete();
       } else {
         throw new Error(result.error || "Failed to stop interview");
       }
     } catch (error) {
-      console.error("Error stopping interview:", error);
-      setError(error.message || "Failed to stop interview");
-      setStopRequested(false);
+      dispatch({
+        type: "SET_ERROR",
+        payload: error.message || "Failed to stop interview",
+      });
+      dispatch({ type: "SET_IS_INTERVIEW_ACTIVE", payload: false });
     }
   };
 
@@ -341,119 +345,29 @@ const InterviewComponent = () => {
       <Navbar />
       <div className="interview-container">
         <div className="interview-content">
-          <div className="webcam-container">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className={`webcam-feed ${isRecording ? "recording-active" : ""}`}
-            />
-            {isRecording && (
-              <div className="recording-indicator">
-                <span className="recording-dot"></span>
-                Recording
-              </div>
-            )}
-          </div>
-
-          <div className="interview-chat">
-            <h2>AI Interview Session</h2>
-
-            <div className="status-section">
-              <p>
-                <strong>Status:</strong> {status}
-              </p>
-              {progress && (
-                <p>
-                  <strong>Progress:</strong>Quation{" "}
-                  {quationNumber ? quationNumber : 0}/5
-                </p>
-              )}
-              {error && <p className="error-message">{error}</p>}
-            </div>
-
-            <div className="controls">
-              {!isInterviewActive ? (
-                <button onClick={startInterview}>Start Interview</button>
-              ) : (
-                <div className="interview-controls">
-                  <button onClick={stopInterview}>Stop Interview</button>
-                </div>
-              )}
-            </div>
-
-            {currentQuestion && (
-              <div className="question-section">
-                <h3>Current Question:</h3>
-                <p className="question">{currentQuestion}</p>
-              </div>
-            )}
-
-            {feedback && (
-              <div className="feedback-section">
-                <h3>Feedback:</h3>
-                <p>{feedback}</p>
-              </div>
-            )}
-
-            {showFinalFeedback && finalFeedback && (
-              <div className="final-feedback-section">
-                <h3>Interview Summary</h3>
-                <div className="feedback-category">
-                  <h4>Strengths:</h4>
-                  <div className="feedback-content">
-                    {finalFeedback.strengths.split("\n").map((item, i) => (
-                      <p key={i}>{item}</p>
-                    ))}
-                  </div>
-                </div>
-                <div className="feedback-category">
-                  <h4>Areas for Improvement:</h4>
-                  <div className="feedback-content">
-                    {finalFeedback.weaknesses.split("\n").map((item, i) => (
-                      <p key={i}>{item}</p>
-                    ))}
-                  </div>
-                </div>
-                <div className="feedback-category">
-                  <h4>Suggestions:</h4>
-                  <div className="feedback-content">
-                    {finalFeedback.suggestions.split("\n").map((item, i) => (
-                      <p key={i}>{item}</p>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {questions.length > 0 && (
-              <div className="history-section">
-                <h3>Interview History:</h3>
-                {questions.map((item, index) => (
-                  <div key={index} className="qa-item">
-                    <p className="question-history">
-                      <strong>Q{index + 1}:</strong> {item.question}
-                    </p>
-                    {item.answer && (
-                      <p className="answer-history">
-                        <strong>A:</strong> {item.answer}
-                      </p>
-                    )}
-                    {item.feedback && (
-                      <p className="feedback-history">
-                        <strong>Feedback:</strong> {item.feedback}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <WebcamRecorder videoRef={videoRef} isRecording={isRecording} />
+          <InterviewChat
+            status={status}
+            progress={progress}
+            error={error}
+            quationNumber={quationNumber}
+            isInterviewActive={isInterviewActive}
+            startInterview={startInterview}
+            stopInterview={stopInterview}
+            currentQuestion={currentQuestion}
+            feedback={feedback}
+            showFinalFeedback={showFinalFeedback}
+            finalFeedback={finalFeedback}
+            questions={questions}
+            currentAnswer={currentAnswer}
+            handleUserInput={handleUserInput}
+            submitAnswer={submitAnswer}
+          />
         </div>
       </div>
     </>
   );
-};
-
-export default InterviewComponent;
+}
+export default function InterviewPage() {
+  return <InterviewComponent />;
+}

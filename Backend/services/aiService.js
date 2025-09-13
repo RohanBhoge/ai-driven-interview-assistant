@@ -1,16 +1,22 @@
 // services/aiService.js
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { SpeechClient } = require("@google-cloud/speech");
+const { TextToSpeechClient } = require("@google-cloud/text-to-speech");
+const fs = require("fs");
+const util = require("util");
 
 // Initialize the Generative AI model
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
+const speechClient = new SpeechClient();
+const ttsClient = new TextToSpeechClient();
 /**
  * Cleans and parses a JSON string from the AI's response.
  * @param {string} text - The raw text response from the AI.
  * @returns {object} The parsed JSON object.
  */
+
 const parseAIResponse = (text) => {
   const cleanedText = text
     .replace(/```json/g, "")
@@ -36,9 +42,10 @@ const parseAIResponse = (text) => {
  * @returns {Promise<string>} The generated question.
  */
 
-
 generateQuestion = async (resumeText, difficulty, askedQuestions) => {
-  const askedQuestionsString = askedQuestions.join("\n - ");
+  const askedQuestionsString = askedQuestions
+    .map((q) => q.question)
+    .join("\n - ");
   const prompt = `
     You are an expert technical interviewer. Your task is to generate ONE technical interview question based on the provided resume.
 
@@ -65,6 +72,7 @@ generateQuestion = async (resumeText, difficulty, askedQuestions) => {
  * @param {string} answer - The candidate's answer.
  * @returns {Promise<{feedback: string, nextDifficulty: string}>}
  */
+
 analyzeAnswer = async (question, answer) => {
   const prompt = `
     You are an AI Interview Coach. Evaluate the candidate's answer based on technical accuracy, depth, and clarity.
@@ -135,8 +143,45 @@ generateFinalFeedback = async (qaPairs) => {
   };
 };
 
+const transcribeAudio = async (audioBytes) => {
+  const audio = { content: audioBytes };
+  const config = {
+    encoding: "WEBM_OPUS", // Match the format from the frontend
+    sampleRateHertz: 48000,
+    languageCode: "en-US",
+  };
+  const request = { audio, config };
+
+  const [response] = await speechClient.recognize(request);
+  const transcription = response.results
+    .map((result) => result.alternatives[0].transcript)
+    .join("\n");
+  return transcription;
+};
+
+const synthesizeSpeech = async (text) => {
+  const request = {
+    input: { text },
+    voice: { languageCode: "en-US", ssmlGender: "NEUTRAL" },
+    audioConfig: { audioEncoding: "MP3" },
+  };
+
+  const [response] = await ttsClient.synthesizeSpeech(request);
+  const writeFile = util.promisify(fs.writeFile);
+
+  // Save the file to a public directory accessible by your frontend
+  // Ensure you have a 'public/audio' folder
+  const fileName = `output-${Date.now()}.mp3`;
+  const filePath = `public/audio/${fileName}`;
+  await writeFile(filePath, response.audioContent, "binary");
+
+  // Return the path the frontend can use to access the file
+  return `/audio/${fileName}`;
+};
 module.exports = {
   generateQuestion,
   analyzeAnswer,
   generateFinalFeedback,
+  transcribeAudio,
+  synthesizeSpeech,
 };
