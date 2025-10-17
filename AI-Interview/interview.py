@@ -23,13 +23,13 @@ with contextlib.redirect_stdout(None):
     os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
     import pygame
 
-    pygame.mixer.init()  # Initialize pygame without printing version info
+    pygame.mixer.init()
 
 # Load API key
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Initialize audio system once
+# Initialize audio system
 recognizer = sr.Recognizer()
 
 # Global variable to track asked questions
@@ -40,29 +40,22 @@ def speak(text):
     """Convert text to speech with proper audio queuing"""
     if not text.strip():
         return
-
     try:
-        # Create temporary audio file
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
             tts = gTTS(text=text, lang="en")
             tts.save(fp.name)
             temp_path = fp.name
 
-        # Wait for previous audio to finish
         while pygame.mixer.get_busy():
             time.sleep(0.1)
 
-        # Load and play audio
         sound = pygame.mixer.Sound(temp_path)
         channel = sound.play()
 
-        # Wait for audio to finish
         while channel.get_busy():
             time.sleep(0.1)
 
-        # Clean up
         os.remove(temp_path)
-
     except Exception as e:
         print(json.dumps({"error": f"Audio error: {e}"}), file=sys.stderr)
 
@@ -71,36 +64,30 @@ def listen():
     """Listen to user's voice input and convert it to text"""
     with sr.Microphone() as source:
         recognizer.adjust_for_ambient_noise(source)
-        recognizer.pause_threshold = 2.0  # Increased pause threshold to 2 seconds
+        recognizer.pause_threshold = 2.0
         recognizer.energy_threshold = 4000
-        recognizer.dynamic_energy_threshold = True  # Auto-adjust for ambient noise
+        recognizer.dynamic_energy_threshold = True
 
         try:
             print(json.dumps({"status": "Listening for answer..."}))
             sys.stdout.flush()
-
-            # Listen with longer timeout and no phrase time limit
             audio = recognizer.listen(source, timeout=10, phrase_time_limit=None)
             print(json.dumps({"status": "Processing answer..."}))
             sys.stdout.flush()
-
             text = recognizer.recognize_google(audio)
             print(json.dumps({"answer": text}))
             sys.stdout.flush()
             return text
-
         except sr.WaitTimeoutError:
             print(json.dumps({"error": "No response received", "status": "Timeout"}))
             sys.stdout.flush()
             return ""
-
         except sr.UnknownValueError:
             print(
                 json.dumps({"error": "Could not understand audio", "status": "Failed"})
             )
             sys.stdout.flush()
             return ""
-
         except Exception as e:
             print(
                 json.dumps(
@@ -114,26 +101,20 @@ def listen():
 def ask_question(resume_text, difficulty="medium"):
     """Generate a question based on resume and difficulty"""
     global asked_questions
-
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    prompt = f"""  
-    Act as an interviewer. Ask one {difficulty}-level technical question based on this resume:  
-    {resume_text}  
-    Return ONLY the question (no extra text).  
+    model = genai.GenerativeModel("gemini-2.5-flash")  # Updated model
+    prompt = f"""
+    Act as an interviewer. Ask one {difficulty}-level technical question based on this resume:
+    {resume_text}
+    Return ONLY the question (no extra text).
     """
-
-    max_attempts = 5  # Prevent infinite loops
+    max_attempts = 5
     attempt = 0
-
     while attempt < max_attempts:
         try:
             print(json.dumps({"status": "Generating question..."}))
             sys.stdout.flush()
-
             response = model.generate_content(prompt)
             question = response.text.strip()
-
-            # Check if question is unique
             if question not in asked_questions:
                 asked_questions.add(question)
                 print(json.dumps({"question": question, "difficulty": difficulty}))
@@ -142,13 +123,12 @@ def ask_question(resume_text, difficulty="medium"):
             else:
                 attempt += 1
                 if attempt < max_attempts:
-                    prompt = f"""  
-                    The question "{question}" was already asked. 
-                    Generate a different {difficulty}-level technical question based on this resume:  
-                    {resume_text}  
-                    Return ONLY the question (no extra text).  
+                    prompt = f"""
+                    The question "{question}" was already asked.
+                    Generate a different {difficulty}-level technical question based on this resume:
+                    {resume_text}
+                    Return ONLY the question (no extra text).
                     """
-
         except Exception as e:
             print(
                 json.dumps(
@@ -157,14 +137,8 @@ def ask_question(resume_text, difficulty="medium"):
             )
             sys.stdout.flush()
             return None
-
     print(
-        json.dumps(
-            {
-                "error": "Could not generate unique question after multiple attempts",
-                "status": "Error",
-            }
-        )
+        json.dumps({"error": "Could not generate unique question", "status": "Error"})
     )
     sys.stdout.flush()
     return None
@@ -172,34 +146,31 @@ def ask_question(resume_text, difficulty="medium"):
 
 def analyze_answer(question, answer):
     """Analyze the candidate's answer and provide feedback"""
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    prompt = f"""  
-    You are an AI interviewer analyzing a candidate's answer.  
-    Evaluate based on:  
-    1. Accuracy: Is the answer correct and relevant?  
-    2. Depth: Does it show good understanding?  
-    3. Clarity: Is it clear and well-structured?  
+    model = genai.GenerativeModel("gemini-1.5-flash")  # Updated model
+    prompt = f"""
+    You are an AI interviewer analyzing a candidate's answer.
+    Evaluate based on:
+    1. Accuracy: Is the answer correct and relevant?
+    2. Depth: Does it show good understanding?
+    3. Clarity: Is it clear and well-structured?
 
-    Provide feedback in one sentence and difficulty adjustment:  
-    "Feedback: <your feedback>. Next: <HARDER/SAME/EASIER>"  
+    Provide feedback in one sentence and difficulty adjustment:
+    "Feedback: <your feedback>. Next: <HARDER/SAME/EASIER>"
 
-    Question: {question}  
-    Answer: {answer}  
+    Question: {question}
+    Answer: {answer}
     """
     try:
         print(json.dumps({"status": "Analyzing answer..."}))
         sys.stdout.flush()
-
         response = model.generate_content(prompt)
         feedback = response.text.strip()
-
         if "Next: HARDER" in feedback:
             next_difficulty = "hard"
         elif "Next: EASIER" in feedback:
             next_difficulty = "easy"
         else:
             next_difficulty = "medium"
-
         print(json.dumps({"feedback": feedback, "nextDifficulty": next_difficulty}))
         sys.stdout.flush()
         return feedback, next_difficulty
@@ -211,12 +182,10 @@ def analyze_answer(question, answer):
 
 def generate_final_feedback(questions_and_answers):
     """Generate comprehensive feedback based on all questions and answers"""
-    model = genai.GenerativeModel("gemini-2.0-flash")
-
+    model = genai.GenerativeModel("gemini-1.5-flash")  # Updated model
     conversation_history = "\n".join(
         [f"Q: {qa['question']}\nA: {qa['answer']}\n" for qa in questions_and_answers]
     )
-
     prompt = f"""
     You are an experienced technical interviewer analyzing a complete interview session.
     Based on the following questions and answers, provide comprehensive feedback with these keys:
@@ -224,7 +193,7 @@ def generate_final_feedback(questions_and_answers):
     - "weaknesses": List 2-3 areas that need improvement (as a single string with line breaks)
     - "suggestions": Provide 2-3 actionable suggestions (as a single string with line breaks)
     
-    Return ONLY valid JSON with string values (not arrays) in this exact format:
+    Return ONLY valid JSON with string values in this exact format:
     {{
         "strengths": "1. Strength one\\n2. Strength two",
         "weaknesses": "1. Weakness one\\n2. Weakness two",
@@ -234,48 +203,37 @@ def generate_final_feedback(questions_and_answers):
     Interview Transcript:
     {conversation_history}
     """
-
     try:
         response = model.generate_content(prompt)
         feedback_text = response.text.strip()
-
-        # Clean the response
         if feedback_text.startswith("```json"):
             feedback_text = feedback_text[7:-3].strip()
         elif feedback_text.startswith("```"):
             feedback_text = feedback_text[3:-3].strip()
-
-        # Parse to validate JSON
         feedback = json.loads(feedback_text)
-
-        # Ensure all values are strings
         for key in ["strengths", "weaknesses", "suggestions"]:
             if isinstance(feedback[key], list):
                 feedback[key] = "\n".join(feedback[key])
             elif not isinstance(feedback[key], str):
                 feedback[key] = str(feedback[key])
-
         return json.dumps(feedback)
     except Exception as e:
-        print(
-            json.dumps(
-                {
-                    "error": f"Error generating final feedback: {e}",
-                    "fallback": {
-                        "strengths": "1. Candidate attempted to answer questions",
-                        "weaknesses": "1. Technical depth needs improvement",
-                        "suggestions": "1. Review core concepts\n2. Practice explaining technical topics",
-                    },
-                }
-            )
-        )
+        fallback_feedback = {
+            "error": f"Error generating final feedback: {e}",
+            "fallback": {
+                "strengths": "1. Candidate attempted to answer questions",
+                "weaknesses": "1. Technical depth needs improvement",
+                "suggestions": "1. Review core concepts\n2. Practice explaining technical topics",
+            },
+        }
+        print(json.dumps(fallback_feedback))
         sys.stdout.flush()
         return None
 
 
 def main():
     try:
-        # Check if we're in final feedback mode
+        # MODE 1: Final Feedback Generation
         if len(sys.argv) > 2 and sys.argv[1] == "--final-feedback":
             try:
                 qa_pairs = json.loads(sys.argv[2])
@@ -284,38 +242,29 @@ def main():
                     print(feedback)
                 sys.exit(0)
             except Exception as e:
-                print(json.dumps({"error": str(e)}))
+                print(
+                    json.dumps({"error": f"Failed to process final feedback: {str(e)}"})
+                )
                 sys.exit(1)
 
-        # Original interview flow
-        print(json.dumps({"status": "Starting interview process"}))
-        sys.stdout.flush()
-
+        # MODE 2: Standard Interview Flow
         if len(sys.argv) < 2:
-            print(json.dumps({"error": "Resume text is required"}))
-            sys.stdout.flush()
+            print(json.dumps({"error": "Resume text argument is required."}))
             sys.exit(1)
 
         resume_text = sys.argv[1]
+        print(json.dumps({"status": "Starting interview process"}))
+        sys.stdout.flush()
 
-        #     resume_text = """ Relevant Coursework: Front-end dev, Back-End Development, Html, Css, JavaScript, ReactJs, API,
-        # Debugging, React Router, Unit testing, RESTful APIs, Data Structures and Algorithms, NodeJS
-        # Programming Languages: Advance JavaScript, Basic Python, Basic C++, SQL
-        # Tools:Visual Studio, Jupyter Notebook, Git and GitHub, Postman, MongoDB Atlas
-        # Frameworks: ReactJS, Express.js, Mongoose
-        # Key Skills: Front-End Development, Back-End Development, Database Management, Responsive Design,
-        # Version Control, Problem Solving, Critical Thinking"""
-
-        # Get resume text from command line argument
         difficulty = "medium"
-        quations = 5  # Number of questions to ask
-        for i in range(quations):  # Ask 5 questions
-            if getattr(sys, "stop_requested", False):
-                print(json.dumps({"status": "Stopping interview", "complete": True}))
-                break
+        questions_to_ask = 5
+        for i in range(questions_to_ask):
             print(
                 json.dumps(
-                    {"progress": f"Question {i+1}/{quations}", "questionNumber": i + 1}
+                    {
+                        "progress": f"Question {i+1}/{questions_to_ask}",
+                        "questionNumber": i + 1,
+                    }
                 )
             )
             sys.stdout.flush()
@@ -324,9 +273,6 @@ def main():
             if not question:
                 continue
 
-            print(json.dumps({"question": question, "difficulty": difficulty}))
-            sys.stdout.flush()
-
             speak(question)
             time.sleep(1)
 
@@ -334,13 +280,11 @@ def main():
             if not answer:
                 answer = "No answer provided"
 
-            print(json.dumps({"answer": answer}))
+            print(json.dumps({"answer": answer}))  # To confirm answer was captured
             sys.stdout.flush()
 
             feedback, next_difficulty = analyze_answer(question, answer)
-            print(json.dumps({"feedback": feedback}))
-            sys.stdout.flush()
-
+            # The analyze_answer function already prints its own JSON, no need to print again here.
             difficulty = next_difficulty
 
         print(json.dumps({"status": "Interview completed", "complete": True}))

@@ -1,5 +1,3 @@
-import React from "react";
-
 const WebcamRecorder = ({ videoRef, isRecording }) => (
   <div className="webcam-container">
     <video

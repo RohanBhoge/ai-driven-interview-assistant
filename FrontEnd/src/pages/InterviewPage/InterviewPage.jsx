@@ -368,6 +368,7 @@ function InterviewComponent() {
     </>
   );
 }
+
 export default function InterviewPage() {
   return <InterviewComponent />;
 }
