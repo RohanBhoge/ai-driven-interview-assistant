@@ -1,302 +1,273 @@
 import os
-import sys
-import contextlib
 import json
-import time
-import tempfile
+from flask import Flask, request, jsonify
+from flask_cors import CORS  # Import CORS
 from dotenv import load_dotenv
-import speech_recognition as sr
-from gtts import gTTS
 import google.generativeai as genai
-import signal
 
-
-def handle_interrupt(signum, frame):
-    print(json.dumps({"status": "Interview stopped by user", "complete": True}))
-    sys.exit(0)
-
-
-signal.signal(signal.SIGTERM, handle_interrupt)
-
-# Suppress pygame output
-with contextlib.redirect_stdout(None):
-    os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
-    import pygame
-
-    pygame.mixer.init()
-
-# Load API key
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Initialize audio system
-recognizer = sr.Recognizer()
+API_KEY = os.getenv("GEMINI_API_KEY")
+if not API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is not set in environment")
 
-# Global variable to track asked questions
-asked_questions = set()
+genai.configure(api_key=API_KEY)
 
-
-def speak(text):
-    """Convert text to speech with proper audio queuing"""
-    if not text.strip():
-        return
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
-            tts = gTTS(text=text, lang="en")
-            tts.save(fp.name)
-            temp_path = fp.name
-
-        while pygame.mixer.get_busy():
-            time.sleep(0.1)
-
-        sound = pygame.mixer.Sound(temp_path)
-        channel = sound.play()
-
-        while channel.get_busy():
-            time.sleep(0.1)
-
-        os.remove(temp_path)
-    except Exception as e:
-        print(json.dumps({"error": f"Audio error: {e}"}), file=sys.stderr)
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 
-def listen():
-    """Listen to user's voice input and convert it to text"""
-    with sr.Microphone() as source:
-        recognizer.adjust_for_ambient_noise(source)
-        recognizer.pause_threshold = 2.0
-        recognizer.energy_threshold = 4000
-        recognizer.dynamic_energy_threshold = True
-
-        try:
-            print(json.dumps({"status": "Listening for answer..."}))
-            sys.stdout.flush()
-            audio = recognizer.listen(source, timeout=10, phrase_time_limit=None)
-            print(json.dumps({"status": "Processing answer..."}))
-            sys.stdout.flush()
-            text = recognizer.recognize_google(audio)
-            print(json.dumps({"answer": text}))
-            sys.stdout.flush()
-            return text
-        except sr.WaitTimeoutError:
-            print(json.dumps({"error": "No response received", "status": "Timeout"}))
-            sys.stdout.flush()
-            return ""
-        except sr.UnknownValueError:
-            print(
-                json.dumps({"error": "Could not understand audio", "status": "Failed"})
-            )
-            sys.stdout.flush()
-            return ""
-        except Exception as e:
-            print(
-                json.dumps(
-                    {"error": f"Voice recognition error: {e}", "status": "Error"}
-                )
-            )
-            sys.stdout.flush()
-            return ""
+def _strip_code_fences(text: str) -> str:
+    """Remove ```json or ``` fences if present and trim whitespace."""
+    if not text:
+        return text
+    text = text.strip()
+    # remove leading/trailing ```json or ```
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    return text.strip()
 
 
-def ask_question(resume_text, difficulty="medium"):
-    """Generate a question based on resume and difficulty"""
-    global asked_questions
-    model = genai.GenerativeModel("gemini-2.5-flash")  # Updated model
-    prompt = f"""
-    Act as an interviewer. Ask one {difficulty}-level technical question based on this resume:
-    {resume_text}
-    Return ONLY the question (no extra text).
+@app.route("/generate-question", methods=["POST"])
+def generate_question():
     """
-    max_attempts = 5
-    attempt = 0
-    while attempt < max_attempts:
-        try:
-            print(json.dumps({"status": "Generating question..."}))
-            sys.stdout.flush()
-            response = model.generate_content(prompt)
-            question = response.text.strip()
-            if question not in asked_questions:
-                asked_questions.add(question)
-                print(json.dumps({"question": question, "difficulty": difficulty}))
-                sys.stdout.flush()
-                return question
-            else:
-                attempt += 1
-                if attempt < max_attempts:
-                    prompt = f"""
-                    The question "{question}" was already asked.
-                    Generate a different {difficulty}-level technical question based on this resume:
-                    {resume_text}
-                    Return ONLY the question (no extra text).
-                    """
-        except Exception as e:
-            print(
-                json.dumps(
-                    {"error": f"Error generating question: {e}", "status": "Error"}
-                )
-            )
-            sys.stdout.flush()
-            return None
-    print(
-        json.dumps({"error": "Could not generate unique question", "status": "Error"})
-    )
-    sys.stdout.flush()
-    return None
-
-
-def analyze_answer(question, answer):
-    """Analyze the candidate's answer and provide feedback"""
-    model = genai.GenerativeModel("gemini-1.5-flash")  # Updated model
-    prompt = f"""
-    You are an AI interviewer analyzing a candidate's answer.
-    Evaluate based on:
-    1. Accuracy: Is the answer correct and relevant?
-    2. Depth: Does it show good understanding?
-    3. Clarity: Is it clear and well-structured?
-
-    Provide feedback in one sentence and difficulty adjustment:
-    "Feedback: <your feedback>. Next: <HARDER/SAME/EASIER>"
-
-    Question: {question}
-    Answer: {answer}
-    """
-    try:
-        print(json.dumps({"status": "Analyzing answer..."}))
-        sys.stdout.flush()
-        response = model.generate_content(prompt)
-        feedback = response.text.strip()
-        if "Next: HARDER" in feedback:
-            next_difficulty = "hard"
-        elif "Next: EASIER" in feedback:
-            next_difficulty = "easy"
-        else:
-            next_difficulty = "medium"
-        print(json.dumps({"feedback": feedback, "nextDifficulty": next_difficulty}))
-        sys.stdout.flush()
-        return feedback, next_difficulty
-    except Exception as e:
-        print(json.dumps({"error": f"Error analyzing answer: {e}", "status": "Error"}))
-        sys.stdout.flush()
-        return "Error analyzing your answer. Please try again.", "medium"
-
-
-def generate_final_feedback(questions_and_answers):
-    """Generate comprehensive feedback based on all questions and answers"""
-    model = genai.GenerativeModel("gemini-1.5-flash")  # Updated model
-    conversation_history = "\n".join(
-        [f"Q: {qa['question']}\nA: {qa['answer']}\n" for qa in questions_and_answers]
-    )
-    prompt = f"""
-    You are an experienced technical interviewer analyzing a complete interview session.
-    Based on the following questions and answers, provide comprehensive feedback with these keys:
-    - "strengths": List 2-3 areas where the candidate performed well (as a single string with line breaks)
-    - "weaknesses": List 2-3 areas that need improvement (as a single string with line breaks)
-    - "suggestions": Provide 2-3 actionable suggestions (as a single string with line breaks)
-    
-    Return ONLY valid JSON with string values in this exact format:
-    {{
-        "strengths": "1. Strength one\\n2. Strength two",
-        "weaknesses": "1. Weakness one\\n2. Weakness two",
-        "suggestions": "1. Suggestion one\\n2. Suggestion two"
-    }}
-    
-    Interview Transcript:
-    {conversation_history}
-    """
-    try:
-        response = model.generate_content(prompt)
-        feedback_text = response.text.strip()
-        if feedback_text.startswith("```json"):
-            feedback_text = feedback_text[7:-3].strip()
-        elif feedback_text.startswith("```"):
-            feedback_text = feedback_text[3:-3].strip()
-        feedback = json.loads(feedback_text)
-        for key in ["strengths", "weaknesses", "suggestions"]:
-            if isinstance(feedback[key], list):
-                feedback[key] = "\n".join(feedback[key])
-            elif not isinstance(feedback[key], str):
-                feedback[key] = str(feedback[key])
-        return json.dumps(feedback)
-    except Exception as e:
-        fallback_feedback = {
-            "error": f"Error generating final feedback: {e}",
-            "fallback": {
-                "strengths": "1. Candidate attempted to answer questions",
-                "weaknesses": "1. Technical depth needs improvement",
-                "suggestions": "1. Review core concepts\n2. Practice explaining technical topics",
-            },
+        Request JSON:
+        {
+          "resumeText": "Rohan Bhoge
+     Pune,India |
+    +919028961783 |
+    er.bhogerohan60@gmail.com |
+    linkedin.com/in/rohanbhoge |
+    github.com/RohanBhoge
+     Education
+     Bachelor of Engineering
+     Artificial Intelligence and Data Science
+     D. Y. Patil College of Engineering, Pune.
+     HSC | 79.00 %
+     Shri Shanishwar Junior College, Sonai.
+     SSC | 75.80 %
+     Dnyaneshwar Vidyalay, Kharwandi
+     Skills
+     2021-2025
+     2020-2021
+     2018-2019
+     Technical Skills
+     • JavaScript, Python, C++
+     • HTML, CSS
+     • Tailwind CSS
+     • ReactJS
+     • NodeJS, ExpressJS
+     • Django, FastAPI
+     • MongoDB, SQL
+     • Gen AI
+     • RAG
+     • Prompt Engineering
+     • Object-Oriented Programming
+     • Git, GitHub
+     • Postman, MongoDB Atlas
+     Experience
+     Soft Skills
+     • Critical Thinking
+     • Time Management
+     • Adaptable
+     • Problem Solver
+     Web Development Intern
+     During my internship, I developed responsive and interactive web pages using HTML, CSS, and JavaScript, ensuring optimal
+     user experience across various devices. I also contributed to project development, applying front-end technologies to build
+     functional and user-friendly interfaces. Additionally, I performed unit testing and debugging to maintain cross-browser
+     compatibility and ensure consistent website performance.
+     Projects
+     QuickCart-ECom– A React-Based E-commerce Web Application
+     QuickCart is a full-stack e-commerce application designed to provide users with an intuitive shopping experience. Built using
+     the MERN stack (MongoDB, Express.js, React.js, and Node.js), this application supports functionalities like browsing products,
+     user authentication, cart management, and order placement.
+     Key features include User authentication, product browsing with filtering and sorting, cart management with quantity control,
+     order placement, and responsive design for all devices using the MERN stack. [Link]
+     AI-Driven Interview Assistance– Interview simulator with adaptive question levels
+     The AI-Driven Interview AssistanceBuilt an AI-driven mock interview simulator using the MERN stack that enables users to
+     upload resumes, receive AI-generated questions based on extracted skills, and interact through real-time audio/video.
+     Integrated speech recognition and text-to-speech for dynamic QA, implemented adaptive difficulty logic, and delivered
+     performance feedback through a seamless and interactive UI. Key features include Resume-based dynamic question generation
+     using Gemini API, real-time video/audio interaction, NLP and ML-powered response analysis, and personalized feedback, built
+     with the MERN stack and Python integration [Link]
+     VidTube– A React-Based Video Streaming Platform
+     The VidTubeThe VidTube app offers a sleek, user-friendly interface for discovering, watching, and enjoying videos. Built with
+     React, CSS, and HTML, the platform ensures a smooth, immersive experience with seamless video playback and easy
+     navigation. Key features include a dynamic video feed, interactive search functionality, user-friendly video player with controls,
+     responsive design, and a highly intuitive interface for an optimal viewing experience on all devices. [Link]",
+          "difficulty": "easy|medium|hard",
+          "askedQuestions": ["q1", "q2", ...]  // optional
         }
-        print(json.dumps(fallback_feedback))
-        sys.stdout.flush()
-        return None
+        Response JSON:
+        { "question": "...", "difficulty": "<difficulty>" }
+    """
+    payload = request.get_json(force=True) or {}
+    resume_text = payload.get("resumeText", "")
+    difficulty = payload.get("difficulty", "medium")
+    asked_questions = payload.get("askedQuestions", []) or []
 
+    # Build prompt
+    prompt = f"""
+You are an expert technical interviewer. Generate ONE {difficulty}-level technical interview question
+based on the resume text below. Make the question relevant to the candidate's skills and role.
 
-def main():
+Resume:
+\"\"\"
+{resume_text}
+\"\"\"
+
+Do NOT return any extra text or commentary — return ONLY the question text.
+If the generated question matches any of the following previously asked questions, generate a different one:
+{json.dumps(asked_questions)}
+"""
+
     try:
-        # MODE 1: Final Feedback Generation
-        if len(sys.argv) > 2 and sys.argv[1] == "--final-feedback":
-            try:
-                qa_pairs = json.loads(sys.argv[2])
-                feedback = generate_final_feedback(qa_pairs)
-                if feedback:
-                    print(feedback)
-                sys.exit(0)
-            except Exception as e:
-                print(
-                    json.dumps({"error": f"Failed to process final feedback: {str(e)}"})
-                )
-                sys.exit(1)
+        model = genai.GenerativeModel("gemini-2.5-flash")  # Using 1.5-flash
+        response = model.generate_content(prompt)
+        question_text = (response.text or "").strip()
+        question_text = _strip_code_fences(question_text)
 
-        # MODE 2: Standard Interview Flow
-        if len(sys.argv) < 2:
-            print(json.dumps({"error": "Resume text argument is required."}))
-            sys.exit(1)
+        if not question_text:
+            return jsonify({"error": "Failed to generate a question."}), 500
 
-        resume_text = sys.argv[1]
-        print(json.dumps({"status": "Starting interview process"}))
-        sys.stdout.flush()
-
-        difficulty = "medium"
-        questions_to_ask = 5
-        for i in range(questions_to_ask):
-            print(
-                json.dumps(
-                    {
-                        "progress": f"Question {i+1}/{questions_to_ask}",
-                        "questionNumber": i + 1,
-                    }
-                )
-            )
-            sys.stdout.flush()
-
-            question = ask_question(resume_text, difficulty)
-            if not question:
-                continue
-
-            speak(question)
-            time.sleep(1)
-
-            answer = listen()
-            if not answer:
-                answer = "No answer provided"
-
-            print(json.dumps({"answer": answer}))  # To confirm answer was captured
-            sys.stdout.flush()
-
-            feedback, next_difficulty = analyze_answer(question, answer)
-            # The analyze_answer function already prints its own JSON, no need to print again here.
-            difficulty = next_difficulty
-
-        print(json.dumps({"status": "Interview completed", "complete": True}))
-        sys.stdout.flush()
-        sys.exit(0)
-    except KeyboardInterrupt:
-        print(json.dumps({"status": "Interview stopped", "complete": True}))
-        sys.exit(0)
+        return jsonify({"question": question_text, "difficulty": difficulty})
     except Exception as e:
-        print(json.dumps({"error": str(e), "complete": True}))
-        sys.exit(1)
+        return jsonify({"error": f"Error generating question: {str(e)}"}), 500
+
+
+@app.route("/analyze-answer", methods=["POST"])
+def analyze_answer():
+    """
+    Request JSON:
+    {
+      "question": "...",
+      "answer": "..."
+    }
+
+    Response JSON:
+    {
+      "feedback": "One-sentence feedback ... Next: HARDER/SAME/EASIER",
+      "nextDifficulty": "easy|medium|hard"
+    }
+    """
+    payload = request.get_json(force=True) or {}
+    question = payload.get("question", "")
+    answer = payload.get("answer", "")
+
+    if not question:
+        return jsonify({"error": "question is required"}), 400
+
+    prompt = f"""
+You are an AI interviewer analyzing a candidate's answer.
+Evaluate based on accuracy, depth, and clarity.
+
+Provide a concise one-sentence feedback and indicate the appropriate next difficulty level
+as one of HARDER, SAME, or EASIER.
+
+Return a single JSON object ONLY, for example:
+{{ "feedback": "Feedback sentence. Next: HARDER", "nextDifficulty": "HARDER" }}
+
+Question: {question}
+Answer: {answer}
+"""
+
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(prompt)
+        raw_text = (response.text or "").strip()
+        raw_text = _strip_code_fences(raw_text)
+
+        parsed = {}
+        try:
+            parsed = json.loads(raw_text)
+            feedback = parsed.get("feedback", raw_text)
+            next_diff_raw = parsed.get("nextDifficulty", "")
+        except Exception:
+            feedback = raw_text
+            if "HARDER" in raw_text.upper():
+                next_diff_raw = "HARDER"
+            elif "EASIER" in raw_text.upper():
+                next_diff_raw = "EASIER"
+            else:
+                next_diff_raw = "SAME"
+
+        nd = (next_diff_raw or "SAME").upper()
+        if nd == "HARDER" or nd == "HARD":
+            next_diff = "hard"
+        elif nd == "EASIER" or nd == "EASY":
+            next_diff = "easy"
+        else:
+            next_diff = "medium"
+
+        return jsonify({"feedback": feedback, "nextDifficulty": next_diff})
+    except Exception as e:
+        return jsonify({"error": f"Error analyzing answer: {str(e)}"}), 500
+
+
+@app.route("/final-feedback", methods=["POST"])
+def final_feedback():
+    """
+    Request JSON:
+    {
+      "qaPairs": [ { "question": "...", "answer": "..." }, ... ]
+    }
+
+    Response JSON:
+    {
+      "strengths": "...",
+      "weaknesses": "...",
+      "suggestions": "..."
+    }
+    """
+    payload = request.get_json(force=True) or {}
+    qa_pairs = payload.get("qaPairs", [])
+
+    if not isinstance(qa_pairs, list) or not qa_pairs:
+        return jsonify({"error": "qaPairs (non-empty list) is required"}), 400
+
+    conversation_history = "\n".join(
+        [f"Q: {qa.get('question','')}\nA: {qa.get('answer','')}" for qa in qa_pairs]
+    )
+
+    prompt = f"""
+You are an experienced technical interviewer analyzing a complete interview session.
+Based on the following transcript, return ONLY a single JSON object with these keys:
+- strengths: string (2-3 items separated by newlines)
+- weaknesses: string (2-3 items separated by newlines)
+- suggestions: string (2-3 actionable items separated by newlines)
+
+Return valid JSON only.
+
+Transcript:
+{conversation_history}
+"""
+
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(prompt)
+        raw_text = (response.text or "").strip()
+        raw_text = _strip_code_fences(raw_text)
+
+        try:
+            result = json.loads(raw_text)
+            for k in ["strengths", "weaknesses", "suggestions"]:
+                if k in result and isinstance(result[k], list):
+                    result[k] = "\n".join(result[k])
+                elif k in result and not isinstance(result[k], str):
+                    result[k] = str(result[k])
+            return jsonify(result)
+        except Exception:
+            return jsonify({"raw": raw_text}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error generating final feedback: {str(e)}"}), 500
 
 
 if __name__ == "__main__":
-    main()
+    # Get port from environment or default to 5000
+    port = int(os.getenv("PYTHON_AI_PORT", 5000))
+    print(f"Starting Python AI server on http://localhost:{port}")
+    app.run(host="0.0.0.0", port=port, debug=True)

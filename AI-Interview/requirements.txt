@@ -4,3 +4,5 @@ python-dotenv
 speechrecognition
 gTTS
 pygame
+Flask
+flask-cors
