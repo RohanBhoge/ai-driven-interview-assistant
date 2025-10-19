@@ -16,6 +16,20 @@ const interviewSchema = new mongoose.Schema({
       feedback: { type: String, default: "" },
     },
   ],
+  finalFeedback: {
+    strengths: {
+      type: String,
+      default: "",
+    },
+    weaknesses: {
+      type: String,
+      default: "",
+    },
+    suggestions: {
+      type: String,
+      default: "",
+    },
+  },
 });
 
 module.exports = mongoose.model("Interview", interviewSchema);

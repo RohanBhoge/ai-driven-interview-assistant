@@ -4,104 +4,201 @@ const { PythonShell } = require("python-shell");
 const path = require("path");
 const Interview = require("../models/interview.js");
 const User = require("../models/User.js");
-const aiService = require("../services/aiService.js");
+const { decode } = require("punycode");
+const mongoose = require("mongoose");
+const { exec } = require("child_process");
+let activePythonShell = null;
 
-const MAX_QUESTIONS = 5; // Define the total number of questions for an interview
-
-/**
- * Starts a new interview.
- * Generates the first question.
- */
 exports.startInterview = async (req, res) => {
   try {
-    const { resumeText, userId } = req.body;
-    // const userId = req.user.userId; // Assuming JWT middleware adds user to req
+    // 1. Verify authentication
+    const token = req.headers["x-auth-token"];
+    if (!token) return res.status(401).json({ error: "No token provided" });
 
-    if (!resumeText) {
-      return res.status(400).json({ error: "Resume text is required." });
+    // 2. Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+
+    // 3. Get parameters
+    const { userId, resumeText } = req.query;
+
+    console.log(req.query);
+
+    if (!userId || !resumeText) {
+      return res.status(400).json({ error: "Missing userId or resumeText" });
     }
 
+    // 4. Set SSE headers
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "http://localhost:5173",
+      "Access-Control-Allow-Credentials": "true",
+    });
+    res.flushHeaders();
+
+    // 5. Find user and create interview
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found." });
-    }
+    if (!user || userId === "undifined")
+      return res.status(404).json({ error: "User not found" });
 
-    // Generate the first question
-    const firstQuestionText = await aiService.generateQuestion(
-      resumeText,
-      "medium",
-      []
-    );
+    console.log("Received token:", token);
+
+    const lastInterview = await Interview.findOne({ userId }).sort({
+      interviewNumber: -1,
+    });
+    const interviewNumber = lastInterview
+      ? lastInterview.interviewNumber + 1
+      : 1;
 
     const interview = new Interview({
       userId,
-      resumeText, // Store the resume text for future reference
-      questions: [
-        {
-          question: firstQuestionText,
-          difficulty: "medium",
-          answer: "",
-          feedback: "",
-        },
-      ],
+      interviewNumber,
+      questions: [],
       progress: "In Progress",
     });
-    
     await interview.save();
 
-    // Add interview to user's record
-    // user.interviews.push(interview._id);
-    // await user.save();
+    if (!Array.isArray(user.interviews)) user.interviews = [];
+    user.interviews.push(interview._id);
+    await user.save();
 
-    res.status(201).json({
-      message: "Interview started successfully.",
-      interviewId: interview._id,
-      question: firstQuestionText,
-      questionNumber: 1,
-      totalQuestions: MAX_QUESTIONS,
-    });
-
-  } catch (error) {
-    console.error("Error starting interview:", error);
-    res.status(500).json({ error: "Failed to start interview." });
-  }
-};
-
-/**
- * Submits an answer and gets the next question.
- * If it's the final answer, it automatically generates the final feedback.
- */
-exports.submitAnswer = async (req, res) => {
-  try {
-    const { interviewId, answer } = req.body;
-    const userId = req.user.userId;
-
-    const interview = await Interview.findOne({
-      _id: interviewId,
-      userId: userId,
-      progress: "In Progress",
-    });
-
-    if (!interview) {
-      return res.status(404).json({ error: "Active interview not found." });
-    }
-
-    // Update the last question with the user's answer
-    const lastQuestion = interview.questions[interview.questions.length - 1];
-    lastQuestion.answer = answer;
-
-    // Analyze the answer to get feedback and next difficulty
-    const analysis = await aiService.analyzeAnswer(
-      lastQuestion.question,
-      answer
+    // 6. Send initial connection message
+    res.write(
+      `data: ${JSON.stringify({
+        status: "Connected",
+        interviewId: interview._id,
+      })}\n\n`
     );
-    lastQuestion.feedback = analysis.feedback;
 
-    // Check if the interview is complete
-    if (interview.questions.length >= MAX_QUESTIONS) {
-      // If it is the last question, end the interview
-      interview.progress = "Completed";
-      interview.completedAt = new Date();
+    // 7. Start Python script
+    const pythonScript = path.join(
+      __dirname,
+      "../../AI-Interview/interview.py"
+    );
+    const options = {
+      pythonOptions: ["-u"],
+      args: [resumeText],
+      mode: "text",
+    };
+
+    console.log("Starting Python script...");
+    const shell = new PythonShell(pythonScript, options);
+    activePythonShell = shell; // Store the active shell
+
+    // Message handling with lock mechanism
+    let isProcessing = false;
+    shell.on("message", async (message) => {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      try {
+        const parsedMessage = JSON.parse(message);
+        console.log("Received message from Python:", parsedMessage);
+
+        // Skip duplicate questions
+        if (
+          parsedMessage.question &&
+          interview.questions.length > 0 &&
+          interview.questions[interview.questions.length - 1].question ===
+            parsedMessage.question
+        ) {
+          isProcessing = false;
+          return;
+        }
+
+        parsedMessage.timestamp = new Date().toISOString();
+
+        if (parsedMessage.question) {
+          interview.questions.push({
+            question: parsedMessage.question,
+            difficulty: parsedMessage.difficulty || "medium",
+            answer: "",
+            feedback: "",
+          });
+          res.write(
+            `data: ${JSON.stringify({
+              type: "question",
+              question: parsedMessage.question,
+              questionNumber: interview.questions.length,
+            })}\n\n`
+          );
+        } else if (parsedMessage.answer && interview.questions.length > 0) {
+          const lastIndex = interview.questions.length - 1;
+          interview.questions[lastIndex].answer = parsedMessage.answer;
+        } else if (parsedMessage.feedback && interview.questions.length > 0) {
+          const lastIndex = interview.questions.length - 1;
+          interview.questions[lastIndex].feedback = parsedMessage.feedback;
+        } else if (
+          parsedMessage.error ||
+          parsedMessage.status ||
+          parsedMessage.progress
+        ) {
+          res.write(`data: ${JSON.stringify(parsedMessage)}\n\n`);
+        }
+
+        // Save only if we have changes
+        if (
+          ["question", "answer", "feedback"].some((type) => parsedMessage[type])
+        ) {
+          await interview.save();
+        }
+
+        if (parsedMessage.complete) {
+          interview.progress = "Completed";
+          interview.completedAt = new Date();
+          await interview.save();
+          res.write(
+            `data: ${JSON.stringify({
+              type: "complete",
+              message: "Interview completed",
+            })}\n\n`
+          );
+        }
+      } catch (error) {
+        console.error("Error processing message:", error);
+        res.write(
+          `data: ${JSON.stringify({
+            type: "error",
+            error: "Error processing message",
+            details: error.message,
+          })}\n\n`
+        );
+      } finally {
+        isProcessing = false;
+      }
+    });
+
+    // Error handling
+    shell.on("stderr", (stderr) => {
+      console.error("Python stderr:", stderr);
+      res.write(
+        `data: ${JSON.stringify({
+          type: "debug",
+          message: stderr,
+        })}\n\n`
+      );
+    });
+
+    // Final cleanup and feedback generation
+    shell.end(async (err) => {
+      try {
+        activePythonShell = null;
+        if (err) {
+          console.error("Python script error:", err);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              error: "AI service failed: " + err.message,
+            })}\n\n`
+          );
+        }
+
+        // Mark interview as completed
+        interview.progress = "Completed";
+        interview.completedAt = new Date();
+        await interview.save();
 
         // Generate final feedback
         try {
@@ -169,36 +266,56 @@ exports.submitAnswer = async (req, res) => {
 
               await interview.save();
 
-      return res.status(200).json({
-        message: "Interview completed!",
-        feedback: analysis.feedback,
-        isComplete: true,
-        finalFeedback: interview.finalFeedback,
-      });
-    }
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "complete",
+                  success: true,
+                  message: "Interview completed",
+                  interviewId: interview._id,
+                  finalFeedback: interview.finalFeedback,
+                })}\n\n`
+              );
+            } catch (e) {
+              activePythonShell = null;
+              console.error("Feedback parsing error:", e);
+              // Provide default feedback if all parsing fails
+              interview.finalFeedback = {
+                strengths: "1. Candidate participated in the interview",
+                weaknesses: "1. Technical knowledge needs improvement",
+                suggestions:
+                  "1. Review core concepts\n2. Practice explaining your projects",
+              };
+              await interview.save();
 
-    // If not complete, generate the next question
-    const askedQuestions = interview.questions.map((q) => q.question);
-    const nextQuestionText = await aiService.generateQuestion(
-      interview.resumeText,
-      analysis.nextDifficulty,
-      askedQuestions
-    );
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "complete",
+                  success: true,
+                  message: "Interview completed (default feedback used)",
+                  interviewId: interview._id,
+                  finalFeedback: interview.finalFeedback,
+                })}\n\n`
+              );
+            }
+          });
 
-    interview.questions.push({
-      question: nextQuestionText,
-      difficulty: analysis.nextDifficulty,
-    });
-
-    await interview.save();
-
-    res.status(200).json({
-      message: "Answer submitted.",
-      feedback: analysis.feedback,
-      isComplete: false,
-      nextQuestion: nextQuestionText,
-      questionNumber: interview.questions.length,
-      totalQuestions: MAX_QUESTIONS,
+          feedbackShell.end(() => res.end());
+        } catch (feedbackError) {
+          console.error("Feedback generation error:", feedbackError);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "complete",
+              success: true,
+              message: "Interview completed (feedback generation failed)",
+              interviewId: interview._id,
+            })}\n\n`
+          );
+          res.end();
+        }
+      } catch (finalError) {
+        console.error("Final processing error:", finalError);
+        res.end();
+      }
     });
   } catch (error) {
     console.error("Error starting interview:", error);
@@ -218,14 +335,45 @@ exports.submitAnswer = async (req, res) => {
   }
 };
 
-/**
- * Manually stops an interview before completion.
- */
+// Submit all answers and generate final feedback
+
+exports.getUserInterviews = async (req, res) => {
+  try {
+    const token = req.headers["x-auth-token"];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const userId = decoded.userId;
+
+    const interviews = await Interview.find({ userId })
+      .sort({ date: -1 }) // Sort by most recent first
+      .lean();
+
+    res.json(interviews);
+  } catch (error) {
+    console.error("Error fetching interviews:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 exports.stopInterview = async (req, res) => {
   try {
-    const { interviewId } = req.body;
-    const userId = req.user.userId;
+    const token = req.headers["x-auth-token"];
+    if (!token) return res.status(401).json({ error: "No token provided" });
 
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { interviewId, userId } = req.body;
+
+    // Validate inputs
+    if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
+      return res.status(400).json({ error: "Invalid interview ID" });
+    }
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    // Find and update the interview
     const interview = await Interview.findOneAndUpdate(
       {
         _id: interviewId,
@@ -249,27 +397,38 @@ exports.stopInterview = async (req, res) => {
     if (!interview) {
       return res
         .status(404)
-        .json({ error: "Active interview not found to stop." });
+        .json({ error: "Interview not found or already completed" });
     }
 
-    res.status(200).json({ message: "Interview stopped successfully." });
+    // Terminate the Python process if it's running
+    if (activePythonShell) {
+      try {
+        activePythonShell.childProcess.kill("SIGTERM");
+
+        // For Windows systems, also try taskkill
+        if (process.platform === "win32") {
+          const pid = activePythonShell.childProcess.pid;
+          exec(`taskkill /PID ${pid} /T /F`, (error) => {
+            if (error) console.error("Error killing process tree:", error);
+          });
+        }
+      } catch (killError) {
+        console.error("Error terminating Python process:", killError);
+      } finally {
+        activePythonShell = null;
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Interview stopped successfully",
+      interviewId: interview._id,
+    });
   } catch (error) {
     console.error("Error stopping interview:", error);
-    res.status(500).json({ error: "Failed to stop interview." });
-  }
-};
-
-/**
- * Fetches all interviews for the logged-in user.
- */
-exports.getUserInterviews = async (req, res) => {
-  try {
-    const interviews = await Interview.find({ userId: req.user.userId }).sort({
-      createdAt: -1,
+    res.status(500).json({
+      success: false,
+      error: "Internal server error: " + error.message,
     });
-    res.status(200).json(interviews);
-  } catch (error) {
-    console.error("Error fetching interviews:", error);
-    res.status(500).json({ error: "Failed to fetch interviews." });
   }
 };
