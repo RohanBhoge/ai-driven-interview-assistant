@@ -3,7 +3,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const { fileURLToPath } = require("url");
+// no fileURLToPath in CommonJS; __dirname is available
 const { tmpdir } = require("os");
 const mic = require("mic");
 const { SpeechClient } = require("@google-cloud/speech");
@@ -16,7 +16,7 @@ const mongoose = require("mongoose");
 
 // Environment setup
 dotenv.config();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// In CommonJS modules `__dirname` is available and points to the current directory
 
 // Configure Google clients
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -370,9 +370,11 @@ const loginHandler = async (req, res) => {
  */
 const attachInterviewRoutes = (parentApp, options = {}) => {
   // parentApp should have body-parsing and CORS configured by the main server.
-  parentApp.post("/start-interview", startInterviewHandler);
-  parentApp.get("/user-interviews", getUserInterviewsHandler);
-  parentApp.post("/login", loginHandler);
+  // Mount under the /api/interview/ai namespace to avoid colliding with
+  // the controller-based endpoints which use /api/interview/*.
+  parentApp.post("/api/interview/ai/start", startInterviewHandler);
+  parentApp.get("/api/interview/ai/user-interviews", getUserInterviewsHandler);
+  parentApp.post("/api/interview/ai/login", loginHandler);
 };
 
 module.exports = {
