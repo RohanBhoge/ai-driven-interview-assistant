@@ -6,9 +6,7 @@ const About = () => {
     <>
       <Navbar />
       <div className="about-container">
-        <h1 className="about-title">
-          About AI Driven Mock Interview Assistance
-        </h1>
+        <h1 className="about-title">About AI Driven Interview Assistance</h1>
         <p className="about-description">
           The AI Interview Tool is designed to help candidates practice
           real-world interview scenarios using AI-driven technology. By

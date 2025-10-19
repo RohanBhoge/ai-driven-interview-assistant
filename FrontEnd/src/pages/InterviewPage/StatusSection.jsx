@@ -1,11 +1,12 @@
-const StatusSection = ({ status, progress, error, quationNumber }) => (
+const StatusSection = ({ status, progress, error, questionNumber }) => (
   <div className="status-section">
     <p>
       <strong>Status:</strong> {status}
     </p>
     {progress && (
       <p>
-        <strong>Progress:</strong>Quation {quationNumber ? quationNumber : 0}/5
+        <strong>Progress:</strong> Question{" "}
+        {questionNumber ? questionNumber : 0}/5
       </p>
     )}
     {error && <p className="error-message">{error}</p>}

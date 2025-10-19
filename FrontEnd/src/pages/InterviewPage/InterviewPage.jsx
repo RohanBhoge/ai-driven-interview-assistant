@@ -55,8 +55,8 @@ function interviewReducer(state, action) {
       return { ...state, finalFeedback: action.payload };
     case "SET_SHOW_FINAL_FEEDBACK":
       return { ...state, showFinalFeedback: action.payload };
-    case "SET_QUATION_NUMBER":
-      return { ...state, quationNumber: action.payload };
+    case "SET_QUESTION_NUMBER":
+      return { ...state, questionNumber: action.payload };
     case "RESET":
       return initialState;
     default:
@@ -80,7 +80,7 @@ function InterviewComponent() {
     interviewId,
     finalFeedback,
     showFinalFeedback,
-    quationNumber,
+    questionNumber,
   } = state;
 
   // Webcam recording state
@@ -229,7 +229,7 @@ function InterviewComponent() {
         if (data.type === "question" && data.question) {
           dispatch({ type: "SET_CURRENT_QUESTION", payload: data.question });
           dispatch({
-            type: "SET_QUATION_NUMBER",
+            type: "SET_QUESTION_NUMBER",
             payload: data.questionNumber,
           });
           dispatch({

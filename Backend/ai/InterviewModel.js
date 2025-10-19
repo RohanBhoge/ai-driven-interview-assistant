@@ -1,26 +1,22 @@
-import dotenv from "dotenv";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { exec } from "child_process";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { tmpdir } from "os";
-import mic from "mic";
-import { SpeechClient } from "@google-cloud/speech";
-import player from "play-sound";
-import { promisify } from "util";
-import express from "express";
-import jwt from "jsonwebtoken";
-import mongoose from "mongoose";
-import cors from "cors";
-import bodyParser from "body-parser";
+const dotenv = require("dotenv");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { exec } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const { fileURLToPath } = require("url");
+const { tmpdir } = require("os");
+const mic = require("mic");
+const { SpeechClient } = require("@google-cloud/speech");
+const player = require("play-sound");
+const { promisify } = require("util");
+// Note: this file exposes handlers and a helper to attach routes to an existing Express app.
+// Do not create a separate HTTP server here; the main Backend server should mount these handlers.
+const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 
 // Environment setup
 dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
-app.use(cors());
-app.use(bodyParser.json());
 
 // Configure Google clients
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -226,8 +222,8 @@ const generateFinalFeedback = async (qaPairs) => {
   }
 };
 
-// Express routes
-app.post("/start-interview", async (req, res) => {
+// Handlers to attach to an existing Express app
+const startInterviewHandler = async (req, res) => {
   try {
     const token = req.headers["x-auth-token"];
     if (!token) return res.status(401).json({ error: "No token provided" });
@@ -319,17 +315,22 @@ app.post("/start-interview", async (req, res) => {
     res.end();
   } catch (e) {
     console.error("Interview error:", e);
-    res.write(
-      `data: ${JSON.stringify({
-        type: "error",
-        error: e.message,
-      })}\n\n`
-    );
-    res.end();
+    try {
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          error: e.message,
+        })}\n\n`
+      );
+      res.end();
+    } catch (inner) {
+      // If SSE connection already closed, just log
+      console.error("SSE write failed:", inner);
+    }
   }
-});
+};
 
-app.get("/user-interviews", async (req, res) => {
+const getUserInterviewsHandler = async (req, res) => {
   try {
     const token = req.headers["x-auth-token"];
     if (!token) return res.status(401).json({ error: "No token provided" });
@@ -344,10 +345,9 @@ app.get("/user-interviews", async (req, res) => {
     console.error("Fetch error:", e);
     res.status(500).json({ error: "Internal server error" });
   }
-});
+};
 
-// JWT middleware
-app.post("/login", async (req, res) => {
+const loginHandler = async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email, password });
 
@@ -357,8 +357,31 @@ app.post("/login", async (req, res) => {
     expiresIn: "1h",
   });
   res.json({ token });
-});
+};
 
-// Server startup
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+/**
+ * Attach routes to an existing Express app instance.
+ * Example:
+ *   import express from 'express';
+ *   import { attachInterviewRoutes } from './ai/InterviewModel.js';
+ *   const app = express();
+ *   app.use(express.json());
+ *   attachInterviewRoutes(app);
+ */
+const attachInterviewRoutes = (parentApp, options = {}) => {
+  // parentApp should have body-parsing and CORS configured by the main server.
+  parentApp.post("/start-interview", startInterviewHandler);
+  parentApp.get("/user-interviews", getUserInterviewsHandler);
+  parentApp.post("/login", loginHandler);
+};
+
+module.exports = {
+  askQuestion,
+  analyzeAnswer,
+  generateFinalFeedback,
+  speak,
+  listen,
+  attachInterviewRoutes,
+  User,
+  Interview,
+};

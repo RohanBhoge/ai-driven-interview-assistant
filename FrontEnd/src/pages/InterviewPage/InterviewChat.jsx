@@ -9,7 +9,7 @@ const InterviewChat = ({
   status,
   progress,
   error,
-  quationNumber,
+  questionNumber,
   isInterviewActive,
   startInterview,
   stopInterview,
@@ -28,7 +28,7 @@ const InterviewChat = ({
       status={status}
       progress={progress}
       error={error}
-      quationNumber={quationNumber}
+      questionNumber={questionNumber}
     />
     <ControlButtons
       isInterviewActive={isInterviewActive}

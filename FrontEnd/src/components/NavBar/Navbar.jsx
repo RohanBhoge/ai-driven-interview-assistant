@@ -17,7 +17,7 @@ const Navbar = () => {
     <div className="navbar flex gap-12 justify-between items-center m-7">
       <div className="log">
         <Link to={"/"} className="logo">
-          AI-Driven Mock Interview Assitance
+          AI-Driven Interview Assistance
         </Link>
 
         <Link className="navbar-link" to={"/features"}>

@@ -4,7 +4,24 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS  # Import CORS
 from dotenv import load_dotenv
 import google.generativeai as genai
+import signal
 
+
+def handle_interrupt(signum, frame):
+    print(json.dumps({"status": "Interview stopped by user", "complete": True}))
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, handle_interrupt)
+
+# Suppress pygame output
+with contextlib.redirect_stdout(None):
+    os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+    import pygame
+
+    pygame.mixer.init()  # Initialize pygame without printing version info
+
+# Load API key
 load_dotenv()
 
 API_KEY = os.getenv("GEMINI_API_KEY")
@@ -252,18 +269,113 @@ Transcript:
         raw_text = (response.text or "").strip()
         raw_text = _strip_code_fences(raw_text)
 
-        try:
-            result = json.loads(raw_text)
-            for k in ["strengths", "weaknesses", "suggestions"]:
-                if k in result and isinstance(result[k], list):
-                    result[k] = "\n".join(result[k])
-                elif k in result and not isinstance(result[k], str):
-                    result[k] = str(result[k])
-            return jsonify(result)
-        except Exception:
-            return jsonify({"raw": raw_text}), 200
+        # Parse to validate JSON
+        feedback = json.loads(feedback_text)
+
+        # Ensure all values are strings
+        for key in ["strengths", "weaknesses", "suggestions"]:
+            if isinstance(feedback[key], list):
+                feedback[key] = "\n".join(feedback[key])
+            elif not isinstance(feedback[key], str):
+                feedback[key] = str(feedback[key])
+
+        return json.dumps(feedback)
     except Exception as e:
-        return jsonify({"error": f"Error generating final feedback: {str(e)}"}), 500
+        print(
+            json.dumps(
+                {
+                    "error": f"Error generating final feedback: {e}",
+                    "fallback": {
+                        "strengths": "1. Candidate attempted to answer questions",
+                        "weaknesses": "1. Technical depth needs improvement",
+                        "suggestions": "1. Review core concepts\n2. Practice explaining technical topics",
+                    },
+                }
+            )
+        )
+        sys.stdout.flush()
+        return None
+
+
+def main():
+    try:
+        # Check if we're in final feedback mode
+        if len(sys.argv) > 2 and sys.argv[1] == "--final-feedback":
+            try:
+                qa_pairs = json.loads(sys.argv[2])
+                feedback = generate_final_feedback(qa_pairs)
+                if feedback:
+                    print(feedback)
+                sys.exit(0)
+            except Exception as e:
+                print(json.dumps({"error": str(e)}))
+                sys.exit(1)
+
+        # Original interview flow
+        print(json.dumps({"status": "Starting interview process"}))
+        sys.stdout.flush()
+
+        if len(sys.argv) < 2:
+            print(json.dumps({"error": "Resume text is required"}))
+            sys.stdout.flush()
+            sys.exit(1)
+
+        resume_text = sys.argv[1]
+
+        #     resume_text = """ Relevant Coursework: Front-end dev, Back-End Development, Html, Css, JavaScript, ReactJs, API,
+        # Debugging, React Router, Unit testing, RESTful APIs, Data Structures and Algorithms, NodeJS
+        # Programming Languages: Advance JavaScript, Basic Python, Basic C++, SQL
+        # Tools:Visual Studio, Jupyter Notebook, Git and GitHub, Postman, MongoDB Atlas
+        # Frameworks: ReactJS, Express.js, Mongoose
+        # Key Skills: Front-End Development, Back-End Development, Database Management, Responsive Design,
+        # Version Control, Problem Solving, Critical Thinking"""
+
+        # Get resume text from command line argument
+        difficulty = "medium"
+        quations = 5  # Number of questions to ask
+        for i in range(quations):  # Ask 5 questions
+            if getattr(sys, "stop_requested", False):
+                print(json.dumps({"status": "Stopping interview", "complete": True}))
+                break
+            print(
+                json.dumps(
+                    {"progress": f"Question {i+1}/{quations}", "questionNumber": i + 1}
+                )
+            )
+            sys.stdout.flush()
+
+            question = ask_question(resume_text, difficulty)
+            if not question:
+                continue
+
+            print(json.dumps({"question": question, "difficulty": difficulty}))
+            sys.stdout.flush()
+
+            speak(question)
+            time.sleep(1)
+
+            answer = listen()
+            if not answer:
+                answer = "No answer provided"
+
+            print(json.dumps({"answer": answer}))
+            sys.stdout.flush()
+
+            feedback, next_difficulty = analyze_answer(question, answer)
+            print(json.dumps({"feedback": feedback}))
+            sys.stdout.flush()
+
+            difficulty = next_difficulty
+
+        print(json.dumps({"status": "Interview completed", "complete": True}))
+        sys.stdout.flush()
+        sys.exit(0)
+    except KeyboardInterrupt:
+        print(json.dumps({"status": "Interview stopped", "complete": True}))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"error": str(e), "complete": True}))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

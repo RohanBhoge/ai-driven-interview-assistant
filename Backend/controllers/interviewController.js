@@ -5,9 +5,6 @@ const path = require("path");
 const Interview = require("../models/interview.js");
 const User = require("../models/User.js");
 const { decode } = require("punycode");
-const mongoose = require("mongoose");
-const { exec } = require("child_process");
-let activePythonShell = null;
 
 exports.startInterview = async (req, res) => {
   try {
@@ -21,9 +18,6 @@ exports.startInterview = async (req, res) => {
 
     // 3. Get parameters
     const { userId, resumeText } = req.query;
-
-    console.log(req.query);
-
     if (!userId || !resumeText) {
       return res.status(400).json({ error: "Missing userId or resumeText" });
     }
@@ -40,10 +34,7 @@ exports.startInterview = async (req, res) => {
 
     // 5. Find user and create interview
     const user = await User.findById(userId);
-    if (!user || userId === "undifined")
-      return res.status(404).json({ error: "User not found" });
-
-    console.log("Received token:", token);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     const lastInterview = await Interview.findOne({ userId }).sort({
       interviewNumber: -1,
@@ -85,7 +76,6 @@ exports.startInterview = async (req, res) => {
 
     console.log("Starting Python script...");
     const shell = new PythonShell(pythonScript, options);
-    activePythonShell = shell; // Store the active shell
 
     // Message handling with lock mechanism
     let isProcessing = false;
@@ -184,7 +174,6 @@ exports.startInterview = async (req, res) => {
     // Final cleanup and feedback generation
     shell.end(async (err) => {
       try {
-        activePythonShell = null;
         if (err) {
           console.error("Python script error:", err);
           res.write(
@@ -276,7 +265,6 @@ exports.startInterview = async (req, res) => {
                 })}\n\n`
               );
             } catch (e) {
-              activePythonShell = null;
               console.error("Feedback parsing error:", e);
               // Provide default feedback if all parsing fails
               interview.finalFeedback = {
@@ -354,81 +342,5 @@ exports.getUserInterviews = async (req, res) => {
   } catch (error) {
     console.error("Error fetching interviews:", error);
     res.status(500).json({ error: "Internal server error" });
-  }
-};
-
-exports.stopInterview = async (req, res) => {
-  try {
-    const token = req.headers["x-auth-token"];
-    if (!token) return res.status(401).json({ error: "No token provided" });
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { interviewId, userId } = req.body;
-
-    // Validate inputs
-    if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
-      return res.status(400).json({ error: "Invalid interview ID" });
-    }
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: "Invalid user ID" });
-    }
-
-    // Find and update the interview
-    const interview = await Interview.findOneAndUpdate(
-      {
-        _id: interviewId,
-        userId: userId,
-        progress: { $ne: "Completed" },
-      },
-      {
-        $set: {
-          progress: "Stopped",
-          stoppedAt: new Date(),
-          finalFeedback: {
-            strengths: "Interview was stopped before completion",
-            weaknesses: "Unable to assess full performance",
-            suggestions: "Try completing the full interview next time",
-          },
-        },
-      },
-      { new: true }
-    );
-
-    if (!interview) {
-      return res
-        .status(404)
-        .json({ error: "Interview not found or already completed" });
-    }
-
-    // Terminate the Python process if it's running
-    if (activePythonShell) {
-      try {
-        activePythonShell.childProcess.kill("SIGTERM");
-
-        // For Windows systems, also try taskkill
-        if (process.platform === "win32") {
-          const pid = activePythonShell.childProcess.pid;
-          exec(`taskkill /PID ${pid} /T /F`, (error) => {
-            if (error) console.error("Error killing process tree:", error);
-          });
-        }
-      } catch (killError) {
-        console.error("Error terminating Python process:", killError);
-      } finally {
-        activePythonShell = null;
-      }
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Interview stopped successfully",
-      interviewId: interview._id,
-    });
-  } catch (error) {
-    console.error("Error stopping interview:", error);
-    res.status(500).json({
-      success: false,
-      error: "Internal server error: " + error.message,
-    });
   }
 };
