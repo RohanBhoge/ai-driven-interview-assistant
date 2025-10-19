@@ -13,8 +13,5 @@ const router = express.Router();
 // SSE start endpoint remains available at GET /api/interview/start (controller).
 router.get("/start", authMiddleware, startInterview);
 
-// Protect access to list of interviews
-router.get("/interviews", authMiddleware, getUserInterviews);
-
+router.get("/interviews", getUserInterviews);
 module.exports = router;
-
