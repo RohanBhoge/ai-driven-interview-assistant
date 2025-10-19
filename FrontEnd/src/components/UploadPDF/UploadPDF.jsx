@@ -1,11 +1,9 @@
 import { useState } from "react";
 import axios from "axios";
-import "./UploadPDF.css";
+import "./UploadPDF.css"; // Ensure you have this CSS file
 import { useAuth } from "../context/AuthContext";
 import Navbar from "./Navbar";
 import { useInterview } from "../context/InterviewContext";
-import { toast } from "react-toastify"; // Correct import for toast notifications
-import "react-toastify/dist/ReactToastify.css"; // Import toast styles
 
 const UploadPDF = () => {
   const { text, setText } = useInterview();
@@ -19,7 +17,7 @@ const UploadPDF = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
-      toast.warning("Please select a PDF file.");
+      alert("Please select a PDF file.");
       return;
     }
 
@@ -39,13 +37,11 @@ const UploadPDF = () => {
       );
 
       localStorage.setItem("text", response.data.text);
-      setText(response.data.text);
-      toast.success("Resume uploaded successfully!");
+      setText(localStorage.getItem("text"));
+      alert("Resume text extracted successfully.");
     } catch (error) {
       console.error("Error uploading file:", error);
-      toast.error("Failed to upload PDF. Please try again.");
-    } finally {
-      setIsUploading(false);
+      alert("Failed to upload and extract text.");
     }
   };
 

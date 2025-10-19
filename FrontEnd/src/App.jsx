@@ -5,7 +5,6 @@ import { AuthProvider } from "./context/AuthContext";
 import ProfilePage from "./pages/ProfilePage/ProfilePage.jsx";
 import InterviewPage from "./pages/InterviewPage/InterviewPage.jsx";
 import { InterviewProvider } from "./context/InterviewContext";
-import { ToastContainer } from "react-toastify";
 
 function App() {
   return (
