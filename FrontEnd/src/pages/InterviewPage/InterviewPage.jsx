@@ -19,7 +19,7 @@ const initialState = {
   interviewId: null,
   finalFeedback: null,
   showFinalFeedback: false,
-  quationNumber: false,
+  questionNumber: 0,
 };
 
 function interviewReducer(state, action) {
@@ -80,7 +80,6 @@ function InterviewComponent() {
     interviewId,
     finalFeedback,
     showFinalFeedback,
-    questionNumber,
   } = state;
 
   // Webcam recording state
@@ -92,7 +91,7 @@ function InterviewComponent() {
   const eventSourceRef = useRef(null);
 
   // Start webcam
-  const startWebcam = async () => {
+  const startWebcam = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -104,7 +103,7 @@ function InterviewComponent() {
       });
       if (videoRef.current) videoRef.current.srcObject = stream;
       return stream;
-    } catch (err) {
+    } catch {
       dispatch({
         type: "SET_ERROR",
         payload:
@@ -112,10 +111,10 @@ function InterviewComponent() {
       });
       return null;
     }
-  };
+  }, []);
 
   // Start recording
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
     const stream = await startWebcam();
     if (!stream) return false;
     try {
@@ -132,11 +131,11 @@ function InterviewComponent() {
       };
       setIsRecording(true);
       return true;
-    } catch (err) {
+    } catch {
       stream.getTracks().forEach((track) => track.stop());
       return false;
     }
-  };
+  }, [startWebcam]);
 
   // Stop recording
   const stopRecording = () => {
@@ -178,16 +177,16 @@ function InterviewComponent() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 100);
-    } catch (error) {
+    } catch {
       dispatch({ type: "SET_ERROR", payload: "Failed to download recording" });
     }
   };
 
   // Interview complete
-  const handleInterviewComplete = async () => {
+  const handleInterviewComplete = useCallback(async () => {
     const videoBlob = await stopRecording();
     if (videoBlob) downloadVideo(videoBlob);
-  };
+  }, []);
 
   // Start interview
   const startInterview = useCallback(async () => {
@@ -204,20 +203,35 @@ function InterviewComponent() {
           type: "SET_ERROR",
           payload: "Video recording failed - continuing without recording",
         });
+      // Start interview via POST to AI API. The backend responds with interviewId
+      // and also streams SSE on the same endpoint. We do a POST to initiate the
+      // interview and then open an EventSource connection to receive SSE messages.
       if (eventSourceRef.current) eventSourceRef.current.close();
-      const source = new EventSourcePolyfill(
-        `/api/interview/start?userId=${userId}&resumeText=${encodeURIComponent(
-          text
-        )}`,
-        {
-          headers: {
-            "x-auth-token": token,
-            "Content-Type": "application/json",
-          },
-          withCredentials: true,
-          heartbeatTimeout: 60000,
-        }
-      );
+      const startResp = await fetch("/api/interview/ai/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-auth-token": token,
+        },
+        body: JSON.stringify({ userId, resumeText: text }),
+      });
+      // If server returned non-200, throw
+      if (!startResp.ok) {
+        const errBody = await startResp.json().catch(() => ({}));
+        throw new Error(errBody.error || "Failed to start interview");
+      }
+      // Open SSE connection to the same path; some servers accept SSE on the
+      // same POST endpoint, but EventSource doesn't support POST, so append
+      // interviewId as query param to receive the stream.
+      const startJson = await startResp.json().catch(() => ({}));
+      const sseUrl =
+        startJson.sseUrl ||
+        `/api/interview/ai/start?interviewId=${startJson.interviewId}`;
+      const source = new EventSourcePolyfill(sseUrl, {
+        headers: { "x-auth-token": token },
+        withCredentials: true,
+        heartbeatTimeout: 60000,
+      });
       eventSourceRef.current = source;
       source.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -268,7 +282,7 @@ function InterviewComponent() {
           source.close();
         }
       };
-      source.onerror = (event) => {
+      source.onerror = () => {
         dispatch({
           type: "SET_ERROR",
           payload: "Connection error. Please try again.",
@@ -285,7 +299,7 @@ function InterviewComponent() {
       dispatch({ type: "SET_IS_INTERVIEW_ACTIVE", payload: false });
       handleInterviewComplete();
     }
-  }, [text, token, userId]);
+  }, [text, token, userId, handleInterviewComplete, startRecording]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -350,7 +364,7 @@ function InterviewComponent() {
             status={status}
             progress={progress}
             error={error}
-            quationNumber={quationNumber}
+            questionNumber={state.questionNumber}
             isInterviewActive={isInterviewActive}
             startInterview={startInterview}
             stopInterview={stopInterview}

@@ -8,8 +8,12 @@ const authMiddleware = require("../middleware/authMiddleware.js");
 const router = express.Router();
 
 // Protected routes
+// Note: the AI-specific interview endpoints are mounted under
+// /api/interview/ai/* by Backend/ai/InterviewModel.js. The controller-backed
+// SSE start endpoint remains available at GET /api/interview/start (controller).
 router.get("/start", authMiddleware, startInterview);
 
-router.get("/interviews", getUserInterviews);
-router.post("/stop", authMiddleware, stopInterview);
+// Protect access to list of interviews
+router.get("/interviews", authMiddleware, getUserInterviews);
+
 module.exports = router;
