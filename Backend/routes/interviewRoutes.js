@@ -11,8 +11,5 @@ const router = express.Router();
 router.get("/start", authMiddleware, startInterview);
 
 router.get("/interviews", getUserInterviews);
-<<<<<<< HEAD
 router.post("/stop", authMiddleware, stopInterview);
-=======
->>>>>>> parent of dd9b50c (Final Project Complition)
 module.exports = router;
