@@ -17,3 +17,4 @@ router.get("/start", authMiddleware, startInterview);
 router.get("/interviews", authMiddleware, getUserInterviews);
 
 module.exports = router;
+
